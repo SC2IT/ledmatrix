@@ -70,8 +70,8 @@ sudo make install-python PYTHON=$(which python3)
 echo ""
 echo "Step 5: Installing Python dependencies..."
 cd "$(dirname "$0")"
-pip3 install --upgrade pip
-pip3 install -r requirements.txt
+pip3 install --upgrade pip --break-system-packages
+pip3 install -r requirements.txt --break-system-packages
 
 echo ""
 echo "Step 6: Setting up configuration..."
