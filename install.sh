@@ -4,6 +4,9 @@
 
 set -e  # Exit on error
 
+# Save the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 echo "========================================="
 echo "LED Matrix Display System - Installer"
 echo "========================================="
@@ -69,12 +72,13 @@ sudo make install-python PYTHON=$(which python3)
 
 echo ""
 echo "Step 5: Installing Python dependencies..."
-cd "$(dirname "$0")"
+cd "$SCRIPT_DIR"
 pip3 install --upgrade pip --break-system-packages
 pip3 install -r requirements.txt --break-system-packages
 
 echo ""
 echo "Step 6: Setting up configuration..."
+cd "$SCRIPT_DIR"
 if [ ! -f config.yaml ]; then
     cp config.yaml.example config.yaml
     echo "Created config.yaml from template"
@@ -109,7 +113,7 @@ fi
 
 echo ""
 echo "Step 8: Creating systemd service..."
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
 
 sudo tee /etc/systemd/system/ledmatrix.service > /dev/null <<EOF
 [Unit]
