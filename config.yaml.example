@@ -29,7 +29,7 @@ display:
   brightness: 100   # 1-100: Global brightness
 
   # Advanced options (usually don't need to change)
-  hardware_mapping: "adafruit-hat-pwm"  # For Adafruit RGB Matrix HAT
+  hardware_mapping: "adafruit-hat"  # For Adafruit RGB Matrix HAT
   rows: 32
   chain_length: 1
   parallel: 1
