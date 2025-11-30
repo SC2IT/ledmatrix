@@ -61,7 +61,7 @@ class DisplayManager:
 
         # Advanced options
         options.multiplexing = self.config.data['display'].get('multiplexing', 0)
-        options.disable_hardware_pulsing = False
+        options.disable_hardware_pulsing = True  # Required for sound support
 
         try:
             self.matrix = RGBMatrix(options=options)
