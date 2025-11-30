@@ -1,0 +1,330 @@
+"""
+Display manager for RGB LED Matrix
+Uses hzeller/rpi-rgb-led-matrix library
+"""
+
+import logging
+from typing import Optional, List, Tuple
+from PIL import Image, ImageDraw, ImageFont
+from pathlib import Path
+
+try:
+    from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
+    MATRIX_AVAILABLE = True
+except ImportError:
+    MATRIX_AVAILABLE = False
+    logging.warning("rgbmatrix library not available - running in simulation mode")
+
+
+class DisplayManager:
+    """Manages the RGB LED matrix display"""
+
+    def __init__(self, config):
+        """
+        Initialize display manager
+
+        Args:
+            config: Config object with display settings
+        """
+        self.config = config
+        self.matrix = None
+        self.canvas = None
+        self.current_image = None
+
+        # Font cache
+        self.fonts = {}
+        self._load_fonts()
+
+        # Initialize matrix
+        if MATRIX_AVAILABLE:
+            self._init_matrix()
+        else:
+            logging.warning("Matrix hardware not available - using simulation mode")
+
+    def _init_matrix(self):
+        """Initialize RGB matrix hardware"""
+        options = RGBMatrixOptions()
+
+        # Basic dimensions
+        options.rows = self.config.data['display'].get('rows', 32)
+        options.cols = self.config.display_width
+        options.chain_length = self.config.data['display'].get('chain_length', 1)
+        options.parallel = self.config.data['display'].get('parallel', 1)
+
+        # Hardware mapping
+        options.hardware_mapping = self.config.hardware_mapping
+
+        # Quality settings
+        options.pwm_bits = self.config.pwm_bits
+        options.brightness = self.config.brightness
+        options.gpio_slowdown = self.config.gpio_slowdown
+
+        # Advanced options
+        options.multiplexing = self.config.data['display'].get('multiplexing', 0)
+        options.disable_hardware_pulsing = False
+
+        try:
+            self.matrix = RGBMatrix(options=options)
+            self.canvas = self.matrix.CreateFrameCanvas()
+            logging.info(f"Initialized {options.cols}x{options.rows} RGB matrix")
+        except Exception as e:
+            logging.error(f"Failed to initialize matrix: {e}")
+            raise
+
+    def _load_fonts(self):
+        """Load PIL fonts for text rendering"""
+        # Default fonts (PIL built-in)
+        try:
+            # Try to load TrueType fonts if available
+            font_dir = Path(__file__).parent.parent / "fonts"
+
+            # Font size mapping
+            self.fonts = {
+                1: ImageFont.load_default(),  # Will try to load better font below
+                2: ImageFont.load_default(),
+                3: ImageFont.load_default(),
+                4: ImageFont.load_default(),
+            }
+
+            # Try to load TrueType fonts if they exist
+            if font_dir.exists():
+                ttf_files = list(font_dir.glob("*.ttf"))
+                if ttf_files:
+                    try:
+                        # Use first TTF font found with different sizes
+                        font_path = str(ttf_files[0])
+                        self.fonts[1] = ImageFont.truetype(font_path, 6)
+                        self.fonts[2] = ImageFont.truetype(font_path, 8)
+                        self.fonts[3] = ImageFont.truetype(font_path, 12)
+                        self.fonts[4] = ImageFont.truetype(font_path, 16)
+                        logging.info(f"Loaded TrueType font: {ttf_files[0].name}")
+                    except Exception as e:
+                        logging.warning(f"Could not load TTF font: {e}")
+
+        except Exception as e:
+            logging.warning(f"Font loading error: {e}")
+
+    def clear(self):
+        """Clear the display"""
+        if self.matrix:
+            self.canvas.Clear()
+            self.matrix.SwapOnVSync(self.canvas)
+
+        self.current_image = None
+
+    def show_text(self, parsed_lines: List[Tuple[int, int, str]]):
+        """
+        Display formatted text lines
+
+        Args:
+            parsed_lines: List of (color_index, font_size, text) tuples
+        """
+        if not parsed_lines:
+            self.clear()
+            return
+
+        # Create image
+        img = Image.new('RGB', (self.config.display_width, self.config.display_height), color=(0, 0, 0))
+        draw = ImageDraw.Draw(img)
+
+        # Get current palette
+        palette = self.config.get_palette()
+
+        # Calculate positions
+        from .text_renderer import calculate_layout
+        positioned_lines = calculate_layout(parsed_lines, self.config.display_height)
+
+        # Draw each line
+        for color_idx, size, y_pos, text in positioned_lines:
+            if not text.strip():
+                continue
+
+            font = self.fonts.get(size, self.fonts[2])
+            color = palette.get(color_idx, (255, 255, 255))
+
+            # Calculate x position for centering
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            x_pos = (self.config.display_width - text_width) // 2
+
+            # Draw text
+            draw.text((x_pos, y_pos), text, font=font, fill=color)
+
+        # Display image
+        self._show_image(img)
+
+    def show_preset(self, preset_name: str):
+        """
+        Show predefined layout
+
+        Args:
+            preset_name: Name of preset (ON-CALL, FREE, BUSY, QUIET, KNOCK)
+        """
+        preset_name = preset_name.upper().strip()
+
+        preset_map = {
+            "ON-CALL": [(2, 4, "ON-CALL"), (1, 3, "Urgent"), (1, 2, "Needs Only")],
+            "FREE": [(3, 4, "FREE"), (1, 3, "But Knock")],
+            "BUSY": [(2, 3, "BUSY"), (2, 3, "DO NOT"), (2, 3, "ENTER")],
+            "QUIET": [(9, 3, "QUIET"), (22, 2, "MEETING IN"), (22, 2, "PROGRESS")],
+            "KNOCK": [(9, 4, "KNOCK"), (22, 2, "MEETING IN"), (22, 2, "PROGRESS")],
+        }
+
+        if preset_name in preset_map:
+            self.show_text(preset_map[preset_name])
+        else:
+            logging.warning(f"Unknown preset: {preset_name}")
+            self.show_simple_message("Unknown", "Preset")
+
+    def show_simple_message(self, line1: str, line2: Optional[str] = None):
+        """
+        Show simple 1-2 line message
+
+        Args:
+            line1: First line of text
+            line2: Optional second line
+        """
+        lines = [(1, 2, line1)]  # White, medium
+        if line2:
+            lines.append((1, 2, line2))
+
+        self.show_text(lines)
+
+    def show_weather(self, weather_data: dict, condition: str):
+        """
+        Display weather information
+
+        Args:
+            weather_data: Dictionary with weather values
+            condition: Weather condition code
+        """
+        # Create image
+        img = Image.new('RGB', (self.config.display_width, self.config.display_height), color=(0, 0, 0))
+        draw = ImageDraw.Draw(img)
+
+        palette = self.config.get_palette()
+
+        # Try to load weather icon
+        icon_path = self._get_weather_icon_path(condition, weather_data.get('is_night', False))
+        if icon_path and icon_path.exists():
+            try:
+                icon = Image.open(icon_path)
+                # Resize if needed (assuming icons are 24x24)
+                if icon.size != (24, 24):
+                    icon = icon.resize((24, 24))
+                # Place icon in top-right
+                img.paste(icon, (40, 0))
+            except Exception as e:
+                logging.warning(f"Could not load weather icon: {e}")
+
+        # Temperature (large, left side)
+        temp = weather_data.get('temp', 0)
+        temp_color = palette.get(weather_data.get('temp_color', 1), (255, 255, 255))
+        temp_text = f"{temp}F"
+
+        font_large = self.fonts[3]
+        draw.text((1, 0), temp_text, font=font_large, fill=temp_color)
+
+        # Additional weather info (smaller, bottom)
+        feels = weather_data.get('feels_like', temp)
+        wind_speed = weather_data.get('wind_speed', 0)
+        wind_dir = weather_data.get('wind_dir', 'N')
+        humidity = weather_data.get('humidity', 0)
+
+        font_small = self.fonts[1]
+        info_color = palette[1]  # White
+
+        # Line 2: Feels like
+        draw.text((1, 11), f"FL:{feels}F", font=font_small, fill=info_color)
+
+        # Line 3: Wind
+        draw.text((1, 18), f"W:{wind_dir} {wind_speed}", font=font_small, fill=info_color)
+
+        # Line 4: Humidity
+        draw.text((1, 25), f"H:{humidity}%", font=font_small, fill=info_color)
+
+        self._show_image(img)
+
+    def _get_weather_icon_path(self, condition: str, is_night: bool) -> Optional[Path]:
+        """Get path to weather icon file"""
+        icon_dir = Path(__file__).parent.parent / "icons"
+
+        if not icon_dir.exists():
+            return None
+
+        # Map condition to icon filename (simplified)
+        icon_map = {
+            "Clear": "clear",
+            "MostlyClear": "mostly_clear",
+            "PartlyCloudy": "partly_cloudy",
+            "Cloudy": "cloudy",
+            "Rain": "rain",
+            "Snow": "snow",
+            "Thunderstorms": "tstorm",
+        }
+
+        icon_base = icon_map.get(condition, "clear")
+        suffix = "_night" if is_night else ""
+
+        # Try PNG first, then BMP
+        for ext in ['.png', '.bmp']:
+            icon_path = icon_dir / f"{icon_base}{suffix}{ext}"
+            if icon_path.exists():
+                return icon_path
+
+        return None
+
+    def _show_image(self, img: Image.Image):
+        """
+        Display PIL Image on matrix
+
+        Args:
+            img: PIL Image to display
+        """
+        if not self.matrix:
+            logging.debug("Matrix not available - image would be displayed")
+            return
+
+        try:
+            # Ensure image is RGB mode
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            # Resize if needed
+            if img.size != (self.config.display_width, self.config.display_height):
+                img = img.resize((self.config.display_width, self.config.display_height))
+
+            # Clear canvas
+            self.canvas.Clear()
+
+            # Set pixels
+            for y in range(self.config.display_height):
+                for x in range(self.config.display_width):
+                    r, g, b = img.getpixel((x, y))
+                    self.canvas.SetPixel(x, y, r, g, b)
+
+            # Swap buffers
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            self.current_image = img
+
+        except Exception as e:
+            logging.error(f"Error displaying image: {e}")
+
+    def set_brightness(self, brightness: int):
+        """
+        Set display brightness
+
+        Args:
+            brightness: Brightness level 0-100
+        """
+        if self.matrix:
+            self.matrix.brightness = max(0, min(100, brightness))
+            logging.debug(f"Set brightness to {brightness}")
+
+    def __del__(self):
+        """Cleanup on destruction"""
+        if self.matrix:
+            try:
+                self.clear()
+            except:
+                pass

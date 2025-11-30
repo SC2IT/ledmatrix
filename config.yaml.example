@@ -1,0 +1,58 @@
+# Adafruit IO Configuration
+aio:
+  username: "your_aio_username"
+  key: "your_aio_key"
+  feed: "matrixmessage"
+  weather_location_id: 2815  # Your Adafruit IO weather location ID
+
+  # MQTT settings
+  mqtt:
+    enabled: true
+    broker: "io.adafruit.com"
+    port: 1883
+    keepalive: 60
+
+  # REST API fallback
+  rest:
+    enabled: true
+    poll_interval: 10  # seconds (only used if MQTT fails)
+
+# LED Matrix Hardware Configuration
+display:
+  # Matrix dimensions
+  width: 64
+  height: 32
+
+  # Hardware settings
+  gpio_slowdown: 4  # 0-4: Increase if flickering (4 recommended with sound enabled)
+  pwm_bits: 11      # 1-11: Color depth (11 = best quality, more CPU)
+  brightness: 100   # 1-100: Global brightness
+
+  # Advanced options (usually don't need to change)
+  hardware_mapping: "adafruit-hat-pwm"  # For Adafruit RGB Matrix HAT
+  rows: 32
+  chain_length: 1
+  parallel: 1
+  multiplexing: 0
+
+# Day/Night Mode
+schedule:
+  enable_auto_dimming: true
+  day_brightness: 100
+  night_brightness: 40
+  night_start: "22:00"  # 24-hour format
+  night_end: "07:00"
+
+# RTC Configuration
+rtc:
+  enabled: true
+  i2c_bus: 1  # Usually 1 for Pi Zero W 2
+  address: 0x68  # Standard DS1307/DS3231 address
+  sync_interval: 3600  # Sync system time from RTC every hour
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "/var/log/ledmatrix.log"
+  max_size_mb: 10
+  backup_count: 3
