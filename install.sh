@@ -37,10 +37,10 @@ sudo apt-get install -y \
     python3-dev \
     python3-pillow \
     git \
-    libatlas-base-dev \
+    libopenblas-dev \
     i2c-tools \
     build-essential \
-    libgraphicsmagick++-dev \
+    libgraphicsmagick++1-dev \
     libwebp-dev
 
 echo ""
