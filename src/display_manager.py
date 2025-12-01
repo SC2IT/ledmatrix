@@ -106,7 +106,7 @@ class DisplayManager:
                     1: "4x6.bdf",          # Small (6px)
                     2: "5x8.bdf",          # Medium (8px)
                     3: "ter-u12n.bdf",     # Large (12px)
-                    4: "9x15.bdf",         # XLarge (15px) - fits ON-CALL preset
+                    4: "9x15B.bdf",        # XLarge Bold (15px) - fits ON-CALL preset
                     5: "10x20.bdf",        # XXLarge (20px)
                     6: "texgyre-27.bdf",   # Huge (24px) - for FREE preset
                 }
