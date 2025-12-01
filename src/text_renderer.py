@@ -150,17 +150,33 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
         positions.append(y_pos)
 
     elif is_uniform:
-        # Uniform fonts - distribute evenly
+        # Uniform fonts - distribute evenly with proper centering
+        # Calculate based on actual font metrics (ascent + descent)
         size = parsed_lines[0][1]
-        line_height = FONT_SIZES.get(size, 8)
-        spacing = 2  # Pixels between lines
 
-        total_height = (line_height * num_lines) + (spacing * (num_lines - 1))
-        start_y = max(0, (display_height - total_height) // 2)
+        # Font ascent values (top of glyph to baseline)
+        font_ascents = {1: 5, 2: 7, 3: 10, 4: 11, 5: 14}
+        # Font descent values (baseline to bottom of glyph)
+        font_descents = {1: 1, 2: 1, 3: 2, 4: 3, 5: 4}
 
+        ascent = font_ascents.get(size, 7)
+        descent = font_descents.get(size, 1)
+        total_font_height = ascent + descent
+
+        # Baseline-to-baseline spacing
+        baseline_spacing = total_font_height + 1  # 1px gap between lines
+
+        # Calculate total block height (first ascent + spacing + last descent)
+        total_block_height = ascent + (baseline_spacing * (num_lines - 1)) + descent
+
+        # Center the block and calculate first baseline position
+        first_baseline = (display_height - total_block_height) // 2 + ascent
+
+        # Calculate top positions (baseline - ascent) for each line
         for i in range(num_lines):
-            y_pos = start_y + (i * (line_height + spacing))
-            positions.append(y_pos)
+            baseline_y = first_baseline + (i * baseline_spacing)
+            top_y = baseline_y - ascent  # Convert baseline to top position
+            positions.append(top_y)
 
     else:
         # Mixed fonts - use custom layouts for common patterns
