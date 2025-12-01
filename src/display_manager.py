@@ -179,16 +179,12 @@ class DisplayManager:
                 text_width = graphics.DrawText(self.canvas, font, -1000, y_pos, text_color, text)
                 x_pos = (self.config.display_width - text_width) // 2
 
-                # Adjust y_pos for baseline positioning (add font ascent)
-                # CircuitPython uses top-left anchor, graphics.DrawText uses baseline
-                baseline_y = y_pos + self.font_ascents.get(size, 7)
-
-                text_info.append((font, x_pos, baseline_y, text_color, text))
+                text_info.append((font, x_pos, y_pos, text_color, text))
 
             # Clear canvas and draw all text at correct positions
             self.canvas.Clear()
-            for font, x_pos, baseline_y, text_color, text in text_info:
-                graphics.DrawText(self.canvas, font, x_pos, baseline_y, text_color, text)
+            for font, x_pos, y_pos, text_color, text in text_info:
+                graphics.DrawText(self.canvas, font, x_pos, y_pos, text_color, text)
 
             # Swap canvas to display
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
