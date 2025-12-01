@@ -92,20 +92,20 @@ class DisplayManager:
                 1: 5,   # 4x6.bdf ascent
                 2: 7,   # 5x8.bdf ascent
                 3: 10,  # ter-u12n.bdf ascent
-                4: 11,  # ter-u14n.bdf ascent
-                5: 14,  # ter-u18n.bdf ascent
+                4: 16,  # 10x20.bdf ascent
+                5: 19,  # texgyre-27.bdf ascent
             }
 
             # Try to load BDF fonts using native graphics.Font() if available
             if font_dir.exists() and MATRIX_AVAILABLE:
                 # Map specific BDF fonts to size slots
-                # Sizes 4 and 5 use larger fonts to approximate CircuitPython scaling
+                # Sizes 4 and 5 use larger fonts to match CircuitPython scaled sizes (~20-24px)
                 font_mapping = {
-                    1: "4x6.bdf",          # Small
-                    2: "5x8.bdf",          # Medium
-                    3: "ter-u12n.bdf",     # Large
-                    4: "ter-u14n.bdf",     # XLarge (approximates terminalio with scale=2)
-                    5: "ter-u18n.bdf",     # XXLarge (approximates MatrixChunky8 with scale=2/3)
+                    1: "4x6.bdf",          # Small (6px)
+                    2: "5x8.bdf",          # Medium (8px)
+                    3: "ter-u12n.bdf",     # Large (12px)
+                    4: "10x20.bdf",        # XLarge (20px) - matches terminalio with scale=2
+                    5: "texgyre-27.bdf",   # XXLarge (24px) - matches MatrixChunky8 scaled
                 }
 
                 for size, filename in font_mapping.items():

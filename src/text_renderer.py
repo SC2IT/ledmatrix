@@ -110,13 +110,13 @@ class TextParser:
 
 
 # Font size mapping (height in pixels for each size)
-# Matches CircuitPython display_core.py uniform layout font_heights (line 89)
+# Updated to use larger BDF fonts from rpi-rgb-led-matrix repository
 FONT_SIZES = {
-    1: 6,   # Small - 4x6.bdf (no scaling)
-    2: 8,   # Medium - 5x8.bdf (no scaling)
-    3: 8,   # Large - ter-u12n.bdf (no scaling) - visual height 8px in uniform layouts
-    4: 14,  # XLarge - terminalio.FONT with scale=2 (12px base × 2 ≈ 14px visual)
-    5: 16,  # XXLarge - MatrixChunky8.bdf with scale=2 or 3
+    1: 6,   # Small - 4x6.bdf
+    2: 8,   # Medium - 5x8.bdf
+    3: 8,   # Large - ter-u12n.bdf (visual height 8px in uniform layouts)
+    4: 20,  # XLarge - 10x20.bdf (matches CircuitPython scaled fonts)
+    5: 24,  # XXLarge - texgyre-27.bdf (matches CircuitPython scaled fonts)
 }
 
 
@@ -154,8 +154,9 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
         # Matches CircuitPython display_core.py spacing logic
         size = parsed_lines[0][1]
 
-        # Visual heights for spacing calculations (matches CircuitPython line 89)
-        visual_heights = {1: 6, 2: 8, 3: 8, 4: 14, 5: 16}
+        # Visual heights for spacing calculations
+        # Sizes 4 and 5 updated to match new larger BDF fonts
+        visual_heights = {1: 6, 2: 8, 3: 8, 4: 20, 5: 24}
 
         # Row spacing between lines (matches CircuitPython)
         # Size 3 uses 3px spacing (line 103), sizes 1&2 use 2px (line 111)
@@ -184,11 +185,13 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
     else:
         # Mixed fonts - use custom layouts for common patterns
         if num_lines == 3 and font_sizes == [4, 3, 2]:
-            # ON-CALL pattern: XLarge (14px) + Large (8px) + Medium (8px)
-            # Total: 30px + 2px gaps = 32px (exactly fills display)
-            positions = [0, 15, 24]
+            # ON-CALL pattern: XLarge (20px) + Large (8px) + Medium (8px)
+            # Total: 36px - needs negative top margin to fit
+            # Top 4px of first line will be slightly clipped for dramatic effect
+            positions = [-4, 16, 24]
         elif num_lines == 2 and font_sizes == [4, 3]:
-            # FREE pattern: XLarge, Large
+            # FREE pattern: XLarge (20px) + Large (8px)
+            # Total: 28px with 1px gap = 29px, fits comfortably
             positions = [1, 22]
         elif num_lines == 3 and font_sizes == [3, 3, 3]:
             # BUSY pattern: Three large lines (adjusted for baseline positioning)
