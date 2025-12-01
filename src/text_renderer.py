@@ -190,9 +190,9 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
             # Urgent moved up 3px from 15 to 12
             positions = [0, 12, 24]
         elif num_lines == 2 and font_sizes == [6, 3]:
-            # FREE pattern: Huge (24px) + Large (8px)
-            # Total: 32px - exactly fills display
-            positions = [0, 24]
+            # FREE pattern: Huge (24px) + Large (actual 12px, visual 8px)
+            # Adjusted for ter-u12n actual height to prevent overflow
+            positions = [0, 20]
         elif num_lines == 3 and font_sizes == [3, 3, 3]:
             # BUSY pattern: Three large lines (adjusted for baseline positioning)
             # Moved up 2px from CircuitPython [0, 11, 22] to prevent bottom clipping
