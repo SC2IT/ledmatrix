@@ -7,7 +7,6 @@ import logging
 from typing import Optional, List, Tuple
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
-import bdfparser
 
 try:
     from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
@@ -15,49 +14,6 @@ try:
 except ImportError:
     MATRIX_AVAILABLE = False
     logging.warning("rgbmatrix library not available - running in simulation mode")
-
-
-class BDFFont:
-    """Wrapper for BDF fonts to work with PIL ImageDraw"""
-
-    def __init__(self, bdf_path):
-        """Load a BDF font file"""
-        self.font = bdfparser.Font(bdf_path)
-        self.font_height = self.font.headers.get('FONT_ASCENT', 0) + abs(self.font.headers.get('FONT_DESCENT', 0))
-
-    def getsize(self, text):
-        """Get the size of text rendered with this font (deprecated but still used)"""
-        bitmap = self.font.draw(text)
-        return (bitmap.width(), bitmap.height())
-
-    def getbbox(self, text):
-        """Get bounding box for text"""
-        bitmap = self.font.draw(text)
-        return (0, 0, bitmap.width(), bitmap.height())
-
-    def draw_text(self, image, position, text, fill):
-        """Draw text using BDF font on a PIL Image object"""
-        # Render text to bitmap using bdfparser
-        bitmap = self.font.draw(text)
-
-        # Convert bitmap to PIL Image
-        # First convert to bytes - use '1' mode for 1-bit bitmap
-        bitmap_bytes = bitmap.tobytes('1')
-        text_img = Image.frombytes('1', (bitmap.width(), bitmap.height()), bitmap_bytes)
-
-        # Create a colored version of the text
-        colored_img = Image.new('RGB', (bitmap.width(), bitmap.height()), color=(0, 0, 0))
-        pixels = colored_img.load()
-        text_pixels = text_img.load()
-
-        # Apply the color to white pixels in the bitmap
-        for y in range(bitmap.height()):
-            for x in range(bitmap.width()):
-                if text_pixels[x, y]:  # If pixel is white (text)
-                    pixels[x, y] = fill if isinstance(fill, tuple) else (fill, fill, fill)
-
-        # Paste the colored text onto the main image at the specified position
-        image.paste(colored_img, position, text_img)
 
 
 class DisplayManager:
@@ -116,8 +72,7 @@ class DisplayManager:
             raise
 
     def _load_fonts(self):
-        """Load BDF fonts for text rendering"""
-        # Default fonts (PIL built-in)
+        """Load fonts for text rendering using native graphics.Font() for BDF"""
         try:
             font_dir = Path(__file__).parent.parent / "fonts"
 
@@ -130,27 +85,30 @@ class DisplayManager:
             }
             self.fonts_are_bdf = {1: False, 2: False, 3: False, 4: False}
 
-            # Try to load BDF fonts if they exist
-            if font_dir.exists():
+            # Try to load BDF fonts using native graphics.Font() if available
+            if font_dir.exists() and MATRIX_AVAILABLE:
                 # Map specific BDF fonts to size slots
                 font_mapping = {
                     1: "4x6.bdf",          # Small
                     2: "5x8.bdf",          # Medium
                     3: "ter-u12n.bdf",     # Large
-                    4: "MatrixChunky8.bdf" # XLarge (will be scaled)
+                    4: "MatrixChunky8.bdf" # XLarge
                 }
 
                 for size, filename in font_mapping.items():
                     font_path = font_dir / filename
                     if font_path.exists():
                         try:
-                            self.fonts[size] = BDFFont(str(font_path))
+                            # Use native graphics.Font() for BDF fonts
+                            font = graphics.Font()
+                            font.LoadFont(str(font_path))
+                            self.fonts[size] = font
                             self.fonts_are_bdf[size] = True
                             logging.info(f"Loaded BDF font size {size}: {filename}")
                         except Exception as e:
                             logging.warning(f"Could not load BDF font {filename}: {e}")
 
-                # Also try TTF fonts as fallback
+                # Also try TTF fonts as fallback for sizes not loaded
                 ttf_files = list(font_dir.glob("*.ttf"))
                 if ttf_files:
                     for size in [1, 2, 3, 4]:
@@ -184,10 +142,6 @@ class DisplayManager:
             self.clear()
             return
 
-        # Create image
-        img = Image.new('RGB', (self.config.display_width, self.config.display_height), color=(0, 0, 0))
-        draw = ImageDraw.Draw(img)
-
         # Get current palette
         palette = self.config.get_palette()
 
@@ -195,32 +149,57 @@ class DisplayManager:
         from .text_renderer import calculate_layout
         positioned_lines = calculate_layout(parsed_lines, self.config.display_height)
 
-        # Draw each line
-        for color_idx, size, y_pos, text in positioned_lines:
-            if not text.strip():
-                continue
+        # Check if all fonts are BDF (can use direct canvas drawing)
+        all_bdf = all(self.fonts_are_bdf.get(size, False) for _, size, _, _ in positioned_lines)
 
-            font = self.fonts.get(size, self.fonts[2])
-            color = palette.get(color_idx, (255, 255, 255))
+        if all_bdf and self.matrix:
+            # All BDF fonts - draw directly on canvas for better performance
+            self.canvas.Clear()
 
-            # Check if this is a BDF font or regular PIL font
-            is_bdf = self.fonts_are_bdf.get(size, False)
+            # First pass: calculate text widths by drawing offscreen
+            text_info = []
+            for color_idx, size, y_pos, text in positioned_lines:
+                if not text.strip():
+                    continue
 
-            if is_bdf:
-                # BDF font - use custom draw method (pass image, not draw)
-                bbox = font.getbbox(text)
-                text_width = bbox[2] - bbox[0]
+                font = self.fonts.get(size, self.fonts[2])
+                color = palette.get(color_idx, (255, 255, 255))
+                text_color = graphics.Color(color[0], color[1], color[2])
+
+                # Draw at position -1000 to measure width without being visible
+                text_width = graphics.DrawText(self.canvas, font, -1000, y_pos, text_color, text)
                 x_pos = (self.config.display_width - text_width) // 2
-                font.draw_text(img, (x_pos, y_pos), text, color)
-            else:
+
+                text_info.append((font, x_pos, y_pos, text_color, text))
+
+            # Clear canvas and draw all text at correct positions
+            self.canvas.Clear()
+            for font, x_pos, y_pos, text_color, text in text_info:
+                graphics.DrawText(self.canvas, font, x_pos, y_pos, text_color, text)
+
+            # Swap canvas to display
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        else:
+            # Mixed fonts or PIL only - use image-based rendering
+            img = Image.new('RGB', (self.config.display_width, self.config.display_height), color=(0, 0, 0))
+            draw = ImageDraw.Draw(img)
+
+            for color_idx, size, y_pos, text in positioned_lines:
+                if not text.strip():
+                    continue
+
+                font = self.fonts.get(size, self.fonts[2])
+                color = palette.get(color_idx, (255, 255, 255))
+
                 # Regular PIL font
                 bbox = draw.textbbox((0, 0), text, font=font)
                 text_width = bbox[2] - bbox[0]
                 x_pos = (self.config.display_width - text_width) // 2
                 draw.text((x_pos, y_pos), text, font=font, fill=color)
 
-        # Display image
-        self._show_image(img)
+            # Display image
+            self._show_image(img)
 
     def show_preset(self, preset_name: str):
         """
