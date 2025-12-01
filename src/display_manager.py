@@ -86,6 +86,16 @@ class DisplayManager:
             }
             self.fonts_are_bdf = {1: False, 2: False, 3: False, 4: False, 5: False}
 
+            # Font ascent values for BDF fonts (converts top-left to baseline positioning)
+            # graphics.DrawText() uses baseline, CircuitPython used top-left anchor
+            self.font_ascents = {
+                1: 5,   # 4x6.bdf ascent
+                2: 7,   # 5x8.bdf ascent
+                3: 10,  # ter-u12n.bdf ascent
+                4: 11,  # ter-u14n.bdf ascent
+                5: 14,  # ter-u18n.bdf ascent
+            }
+
             # Try to load BDF fonts using native graphics.Font() if available
             if font_dir.exists() and MATRIX_AVAILABLE:
                 # Map specific BDF fonts to size slots
@@ -173,12 +183,17 @@ class DisplayManager:
                 text_width = graphics.DrawText(self.canvas, font, -1000, y_pos, text_color, text)
                 x_pos = (self.config.display_width - text_width) // 2
 
-                text_info.append((font, x_pos, y_pos, text_color, text))
+                # Convert from top-left positioning to baseline positioning
+                # CircuitPython used anchor_point=(0.5, 0) where y is top of text
+                # graphics.DrawText() expects y to be the baseline
+                baseline_y = y_pos + self.font_ascents.get(size, 7)
+
+                text_info.append((font, x_pos, baseline_y, text_color, text))
 
             # Clear canvas and draw all text at correct positions
             self.canvas.Clear()
-            for font, x_pos, y_pos, text_color, text in text_info:
-                graphics.DrawText(self.canvas, font, x_pos, y_pos, text_color, text)
+            for font, x_pos, baseline_y, text_color, text in text_info:
+                graphics.DrawText(self.canvas, font, x_pos, baseline_y, text_color, text)
 
             # Swap canvas to display
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
