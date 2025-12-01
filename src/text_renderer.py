@@ -170,8 +170,9 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
             # FREE pattern: XLarge, Large
             positions = [1, 22]
         elif num_lines == 3 and font_sizes == [3, 3, 3]:
-            # BUSY pattern: Three large lines
-            positions = [0, 11, 22]
+            # BUSY pattern: Three large lines with tight spacing
+            # Font height ~11px, so 12px spacing = 1px gap between lines
+            positions = [0, 12, 24]
         else:
             # Default distribution
             positions = [2, 12, 22][:num_lines]
