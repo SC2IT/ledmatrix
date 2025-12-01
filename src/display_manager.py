@@ -27,19 +27,31 @@ class BDFFont:
 
     def getsize(self, text):
         """Get the size of text rendered with this font (deprecated but still used)"""
-        width = sum(self.font.glyph(char).advance for char in text if char in self.font)
+        width = 0
+        for char in text:
+            try:
+                width += self.font.glyph(char).advance
+            except KeyError:
+                # Character not in font, use average width
+                width += self.font.headers.get('SPACING', 8)
         return (width, self.font_height)
 
     def getbbox(self, text):
         """Get bounding box for text"""
-        width = sum(self.font.glyph(char).advance for char in text if char in self.font)
+        width = 0
+        for char in text:
+            try:
+                width += self.font.glyph(char).advance
+            except KeyError:
+                # Character not in font, use average width
+                width += self.font.headers.get('SPACING', 8)
         return (0, 0, width, self.font_height)
 
     def draw_text(self, draw, position, text, fill):
         """Draw text using BDF font on a PIL ImageDraw object"""
         x, y = position
         for char in text:
-            if char in self.font:
+            try:
                 glyph = self.font.glyph(char)
                 # Draw the glyph bitmap
                 bitmap = glyph.draw()
@@ -49,13 +61,10 @@ class BDFFont:
                             # Adjust for glyph offset
                             px = x + gx + glyph.meta['bbx'][0]
                             py = y + gy + glyph.meta['bby'][1]
-                            if isinstance(fill, tuple):
-                                draw.point((px, py), fill=fill)
-                            else:
-                                draw.point((px, py), fill=fill)
+                            draw.point((px, py), fill=fill)
                 x += glyph.advance
-            else:
-                # Space for missing characters
+            except KeyError:
+                # Character not in font, add space
                 x += self.font.headers.get('SPACING', 8)
 
 
