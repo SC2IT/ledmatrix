@@ -30,7 +30,9 @@ class BDFFont:
         width = 0
         for char in text:
             try:
-                width += self.font.glyph(char).advance
+                glyph = self.font.glyph(char)
+                # Get advance width from glyph metadata (DWIDTH x value)
+                width += glyph.meta.get('dwx0', self.font.headers.get('SPACING', 8))
             except KeyError:
                 # Character not in font, use average width
                 width += self.font.headers.get('SPACING', 8)
@@ -41,7 +43,9 @@ class BDFFont:
         width = 0
         for char in text:
             try:
-                width += self.font.glyph(char).advance
+                glyph = self.font.glyph(char)
+                # Get advance width from glyph metadata (DWIDTH x value)
+                width += glyph.meta.get('dwx0', self.font.headers.get('SPACING', 8))
             except KeyError:
                 # Character not in font, use average width
                 width += self.font.headers.get('SPACING', 8)
@@ -62,7 +66,8 @@ class BDFFont:
                             px = x + gx + glyph.meta['bbx'][0]
                             py = y + gy + glyph.meta['bby'][1]
                             draw.point((px, py), fill=fill)
-                x += glyph.advance
+                # Get advance width from glyph metadata (DWIDTH x value)
+                x += glyph.meta.get('dwx0', self.font.headers.get('SPACING', 8))
             except KeyError:
                 # Character not in font, add space
                 x += self.font.headers.get('SPACING', 8)
