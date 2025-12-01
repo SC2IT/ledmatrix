@@ -110,11 +110,12 @@ class TextParser:
 
 
 # Font size mapping (height in pixels for each size)
+# Matches original CircuitPython config.py font_heights
 FONT_SIZES = {
-    1: 6,   # Small
-    2: 8,   # Medium
-    3: 12,  # Large
-    4: 16,  # XLarge
+    1: 6,   # Small - 4x6.bdf
+    2: 8,   # Medium - 5x8.bdf
+    3: 11,  # Large - ter-u12n.bdf (reduced by 2px from 13 for tighter spacing)
+    4: 8,   # XLarge - MatrixChunky8.bdf (base 8px height, may be scaled)
 }
 
 
