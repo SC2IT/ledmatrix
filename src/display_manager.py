@@ -82,26 +82,20 @@ class DisplayManager:
                 2: ImageFont.load_default(),
                 3: ImageFont.load_default(),
                 4: ImageFont.load_default(),
+                5: ImageFont.load_default(),
             }
-            self.fonts_are_bdf = {1: False, 2: False, 3: False, 4: False}
-
-            # Font ascent values for BDF fonts (for baseline positioning adjustment)
-            # These convert from top-left positioning to baseline positioning
-            self.font_ascents = {
-                1: 5,   # 4x6.bdf ascent
-                2: 7,   # 5x8.bdf ascent
-                3: 10,  # ter-u12n.bdf ascent
-                4: 7,   # MatrixChunky8.bdf ascent
-            }
+            self.fonts_are_bdf = {1: False, 2: False, 3: False, 4: False, 5: False}
 
             # Try to load BDF fonts using native graphics.Font() if available
             if font_dir.exists() and MATRIX_AVAILABLE:
                 # Map specific BDF fonts to size slots
+                # Sizes 4 and 5 use larger fonts to approximate CircuitPython scaling
                 font_mapping = {
                     1: "4x6.bdf",          # Small
                     2: "5x8.bdf",          # Medium
                     3: "ter-u12n.bdf",     # Large
-                    4: "MatrixChunky8.bdf" # XLarge
+                    4: "ter-u14n.bdf",     # XLarge (approximates terminalio with scale=2)
+                    5: "ter-u18n.bdf",     # XXLarge (approximates MatrixChunky8 with scale=2/3)
                 }
 
                 for size, filename in font_mapping.items():
@@ -120,10 +114,10 @@ class DisplayManager:
                 # Also try TTF fonts as fallback for sizes not loaded
                 ttf_files = list(font_dir.glob("*.ttf"))
                 if ttf_files:
-                    for size in [1, 2, 3, 4]:
+                    for size in [1, 2, 3, 4, 5]:
                         if not self.fonts_are_bdf[size]:
                             try:
-                                font_sizes = {1: 6, 2: 8, 3: 12, 4: 16}
+                                font_sizes = {1: 6, 2: 8, 3: 12, 4: 14, 5: 18}
                                 self.fonts[size] = ImageFont.truetype(str(ttf_files[0]), font_sizes[size])
                                 logging.info(f"Loaded TTF font for size {size}")
                             except Exception as e:

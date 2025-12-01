@@ -51,7 +51,7 @@ class TextParser:
 
                         # Validate ranges
                         color_index = max(0, min(27, color_index))  # 0-27 palette
-                        font_size = max(1, min(4, font_size))  # 1-4 font sizes
+                        font_size = max(1, min(5, font_size))  # 1-5 font sizes
 
                         parsed.append((color_index, font_size, text_part))
                     else:
@@ -100,8 +100,8 @@ class TextParser:
                     if color_index < 0 or color_index > 27:
                         issues.append(f"Line {i + 1}: Color {color_index} out of range (0-27)")
 
-                    if font_size < 1 or font_size > 4:
-                        issues.append(f"Line {i + 1}: Font size {font_size} out of range (1-4)")
+                    if font_size < 1 or font_size > 5:
+                        issues.append(f"Line {i + 1}: Font size {font_size} out of range (1-5)")
 
                 except (ValueError, IndexError):
                     issues.append(f"Line {i + 1}: Invalid format")
@@ -110,12 +110,13 @@ class TextParser:
 
 
 # Font size mapping (height in pixels for each size)
-# Matches original CircuitPython config.py font_heights
+# Matches CircuitPython display_core.py uniform layout font_heights (line 89)
 FONT_SIZES = {
-    1: 6,   # Small - 4x6.bdf
-    2: 8,   # Medium - 5x8.bdf
-    3: 11,  # Large - ter-u12n.bdf (reduced by 2px from 13 for tighter spacing)
-    4: 8,   # XLarge - MatrixChunky8.bdf (base 8px height, may be scaled)
+    1: 6,   # Small - 4x6.bdf (no scaling)
+    2: 8,   # Medium - 5x8.bdf (no scaling)
+    3: 8,   # Large - ter-u12n.bdf (no scaling) - visual height 8px in uniform layouts
+    4: 14,  # XLarge - terminalio.FONT with scale=2 (12px base × 2 ≈ 14px visual)
+    5: 16,  # XXLarge - MatrixChunky8.bdf with scale=2 or 3
 }
 
 
@@ -170,9 +171,8 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
             # FREE pattern: XLarge, Large
             positions = [1, 22]
         elif num_lines == 3 and font_sizes == [3, 3, 3]:
-            # BUSY pattern: Three large lines with tight spacing
-            # Font height ~11px, so 12px spacing = 1px gap between lines
-            positions = [0, 12, 24]
+            # BUSY pattern: Three large lines (matches CircuitPython line 257-287)
+            positions = [0, 11, 22]
         else:
             # Default distribution
             positions = [2, 12, 22][:num_lines]
