@@ -151,32 +151,35 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
 
     elif is_uniform:
         # Uniform fonts - distribute evenly with proper centering
-        # Calculate based on actual font metrics (ascent + descent)
+        # Matches CircuitPython display_core.py spacing logic
         size = parsed_lines[0][1]
 
-        # Font ascent values (top of glyph to baseline)
-        font_ascents = {1: 5, 2: 7, 3: 10, 4: 11, 5: 14}
-        # Font descent values (baseline to bottom of glyph)
-        font_descents = {1: 1, 2: 1, 3: 2, 4: 3, 5: 4}
+        # Visual heights for spacing calculations (matches CircuitPython line 89)
+        visual_heights = {1: 6, 2: 8, 3: 8, 4: 14, 5: 16}
 
-        ascent = font_ascents.get(size, 7)
-        descent = font_descents.get(size, 1)
-        total_font_height = ascent + descent
+        # Row spacing between lines (matches CircuitPython)
+        # Size 3 uses 3px spacing (line 103), sizes 1&2 use 2px (line 111)
+        row_spacing = 3 if size == 3 else 2
 
-        # Baseline-to-baseline spacing
-        baseline_spacing = total_font_height + 1  # 1px gap between lines
+        visual_height = visual_heights.get(size, 8)
 
-        # Calculate total block height (first ascent + spacing + last descent)
-        total_block_height = ascent + (baseline_spacing * (num_lines - 1)) + descent
+        # Calculate total content height
+        total_text_height = visual_height * num_lines
+        total_spacing = row_spacing * (num_lines - 1)
+        total_content_height = total_text_height + total_spacing
 
-        # Center the block and calculate first baseline position
-        first_baseline = (display_height - total_block_height) // 2 + ascent
+        # Center the block
+        start_y = (display_height - total_content_height) // 2
 
-        # Calculate top positions (baseline - ascent) for each line
+        # Adjust for size 3 to match CircuitPython (line 105: move up 2px)
+        if size == 3:
+            start_y = max(-2, start_y - 2)
+
+        # Calculate positions with consistent spacing
+        spacing_per_gap = visual_height + row_spacing
         for i in range(num_lines):
-            baseline_y = first_baseline + (i * baseline_spacing)
-            top_y = baseline_y - ascent  # Convert baseline to top position
-            positions.append(top_y)
+            y_pos = start_y + (i * spacing_per_gap)
+            positions.append(y_pos)
 
     else:
         # Mixed fonts - use custom layouts for common patterns
