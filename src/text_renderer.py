@@ -171,8 +171,9 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
             # FREE pattern: XLarge, Large
             positions = [1, 22]
         elif num_lines == 3 and font_sizes == [3, 3, 3]:
-            # BUSY pattern: Three large lines (matches CircuitPython line 257-287)
-            positions = [0, 11, 22]
+            # BUSY pattern: Three large lines (adjusted for baseline positioning)
+            # Moved up 2px from CircuitPython [0, 11, 22] to prevent bottom clipping
+            positions = [-2, 9, 20]
         else:
             # Default distribution
             positions = [2, 12, 22][:num_lines]
