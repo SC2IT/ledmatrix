@@ -27,50 +27,37 @@ class BDFFont:
 
     def getsize(self, text):
         """Get the size of text rendered with this font (deprecated but still used)"""
-        width = 0
-        for char in text:
-            try:
-                glyph = self.font.glyph(char)
-                # Get advance width from glyph metadata (DWIDTH x value)
-                width += glyph.meta.get('dwx0', self.font.headers.get('SPACING', 8))
-            except KeyError:
-                # Character not in font, use average width
-                width += self.font.headers.get('SPACING', 8)
-        return (width, self.font_height)
+        bitmap = self.font.draw(text)
+        return (bitmap.width(), bitmap.height())
 
     def getbbox(self, text):
         """Get bounding box for text"""
-        width = 0
-        for char in text:
-            try:
-                glyph = self.font.glyph(char)
-                # Get advance width from glyph metadata (DWIDTH x value)
-                width += glyph.meta.get('dwx0', self.font.headers.get('SPACING', 8))
-            except KeyError:
-                # Character not in font, use average width
-                width += self.font.headers.get('SPACING', 8)
-        return (0, 0, width, self.font_height)
+        bitmap = self.font.draw(text)
+        return (0, 0, bitmap.width(), bitmap.height())
 
-    def draw_text(self, draw, position, text, fill):
-        """Draw text using BDF font on a PIL ImageDraw object"""
-        x, y = position
-        for char in text:
-            try:
-                glyph = self.font.glyph(char)
-                # Draw the glyph bitmap
-                bitmap = glyph.draw()
-                for gy, row in enumerate(bitmap.todata(2)):
-                    for gx, pixel in enumerate(row):
-                        if pixel == '#':
-                            # Adjust for glyph offset
-                            px = x + gx + glyph.meta['bbx'][0]
-                            py = y + gy + glyph.meta['bby'][1]
-                            draw.point((px, py), fill=fill)
-                # Get advance width from glyph metadata (DWIDTH x value)
-                x += glyph.meta.get('dwx0', self.font.headers.get('SPACING', 8))
-            except KeyError:
-                # Character not in font, add space
-                x += self.font.headers.get('SPACING', 8)
+    def draw_text(self, image, position, text, fill):
+        """Draw text using BDF font on a PIL Image object"""
+        # Render text to bitmap using bdfparser
+        bitmap = self.font.draw(text)
+
+        # Convert bitmap to PIL Image
+        # First convert to bytes - use '1' mode for 1-bit bitmap
+        bitmap_bytes = bitmap.tobytes('1')
+        text_img = Image.frombytes('1', (bitmap.width(), bitmap.height()), bitmap_bytes)
+
+        # Create a colored version of the text
+        colored_img = Image.new('RGB', (bitmap.width(), bitmap.height()), color=(0, 0, 0))
+        pixels = colored_img.load()
+        text_pixels = text_img.load()
+
+        # Apply the color to white pixels in the bitmap
+        for y in range(bitmap.height()):
+            for x in range(bitmap.width()):
+                if text_pixels[x, y]:  # If pixel is white (text)
+                    pixels[x, y] = fill if isinstance(fill, tuple) else (fill, fill, fill)
+
+        # Paste the colored text onto the main image at the specified position
+        image.paste(colored_img, position, text_img)
 
 
 class DisplayManager:
@@ -220,11 +207,11 @@ class DisplayManager:
             is_bdf = self.fonts_are_bdf.get(size, False)
 
             if is_bdf:
-                # BDF font - use custom draw method
+                # BDF font - use custom draw method (pass image, not draw)
                 bbox = font.getbbox(text)
                 text_width = bbox[2] - bbox[0]
                 x_pos = (self.config.display_width - text_width) // 2
-                font.draw_text(draw, (x_pos, y_pos), text, color)
+                font.draw_text(img, (x_pos, y_pos), text, color)
             else:
                 # Regular PIL font
                 bbox = draw.textbbox((0, 0), text, font=font)
@@ -306,7 +293,7 @@ class DisplayManager:
 
         font_large = self.fonts[3]
         if self.fonts_are_bdf.get(3, False):
-            font_large.draw_text(draw, (1, 0), temp_text, temp_color)
+            font_large.draw_text(img, (1, 0), temp_text, temp_color)
         else:
             draw.text((1, 0), temp_text, font=font_large, fill=temp_color)
 
@@ -321,19 +308,19 @@ class DisplayManager:
 
         # Line 2: Feels like
         if self.fonts_are_bdf.get(1, False):
-            font_small.draw_text(draw, (1, 11), f"FL:{feels}F", info_color)
+            font_small.draw_text(img, (1, 11), f"FL:{feels}F", info_color)
         else:
             draw.text((1, 11), f"FL:{feels}F", font=font_small, fill=info_color)
 
         # Line 3: Wind
         if self.fonts_are_bdf.get(1, False):
-            font_small.draw_text(draw, (1, 18), f"W:{wind_dir} {wind_speed}", info_color)
+            font_small.draw_text(img, (1, 18), f"W:{wind_dir} {wind_speed}", info_color)
         else:
             draw.text((1, 18), f"W:{wind_dir} {wind_speed}", font=font_small, fill=info_color)
 
         # Line 4: Humidity
         if self.fonts_are_bdf.get(1, False):
-            font_small.draw_text(draw, (1, 25), f"H:{humidity}%", info_color)
+            font_small.draw_text(img, (1, 25), f"H:{humidity}%", info_color)
         else:
             draw.text((1, 25), f"H:{humidity}%", font=font_small, fill=info_color)
 
