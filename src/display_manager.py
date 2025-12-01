@@ -7,6 +7,7 @@ import logging
 from typing import Optional, List, Tuple
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
+import bdfparser
 
 try:
     from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
@@ -14,6 +15,48 @@ try:
 except ImportError:
     MATRIX_AVAILABLE = False
     logging.warning("rgbmatrix library not available - running in simulation mode")
+
+
+class BDFFont:
+    """Wrapper for BDF fonts to work with PIL ImageDraw"""
+
+    def __init__(self, bdf_path):
+        """Load a BDF font file"""
+        self.font = bdfparser.Font(bdf_path)
+        self.font_height = self.font.headers.get('FONT_ASCENT', 0) + abs(self.font.headers.get('FONT_DESCENT', 0))
+
+    def getsize(self, text):
+        """Get the size of text rendered with this font (deprecated but still used)"""
+        width = sum(self.font.glyph(char).advance for char in text if char in self.font)
+        return (width, self.font_height)
+
+    def getbbox(self, text):
+        """Get bounding box for text"""
+        width = sum(self.font.glyph(char).advance for char in text if char in self.font)
+        return (0, 0, width, self.font_height)
+
+    def draw_text(self, draw, position, text, fill):
+        """Draw text using BDF font on a PIL ImageDraw object"""
+        x, y = position
+        for char in text:
+            if char in self.font:
+                glyph = self.font.glyph(char)
+                # Draw the glyph bitmap
+                bitmap = glyph.draw()
+                for gy, row in enumerate(bitmap.todata(2)):
+                    for gx, pixel in enumerate(row):
+                        if pixel == '#':
+                            # Adjust for glyph offset
+                            px = x + gx + glyph.meta['bbx'][0]
+                            py = y + gy + glyph.meta['bby'][1]
+                            if isinstance(fill, tuple):
+                                draw.point((px, py), fill=fill)
+                            else:
+                                draw.point((px, py), fill=fill)
+                x += glyph.advance
+            else:
+                # Space for missing characters
+                x += self.font.headers.get('SPACING', 8)
 
 
 class DisplayManager:
@@ -72,34 +115,51 @@ class DisplayManager:
             raise
 
     def _load_fonts(self):
-        """Load PIL fonts for text rendering"""
+        """Load BDF fonts for text rendering"""
         # Default fonts (PIL built-in)
         try:
-            # Try to load TrueType fonts if available
             font_dir = Path(__file__).parent.parent / "fonts"
 
-            # Font size mapping
+            # Default to PIL built-in fonts
             self.fonts = {
-                1: ImageFont.load_default(),  # Will try to load better font below
+                1: ImageFont.load_default(),
                 2: ImageFont.load_default(),
                 3: ImageFont.load_default(),
                 4: ImageFont.load_default(),
             }
+            self.fonts_are_bdf = {1: False, 2: False, 3: False, 4: False}
 
-            # Try to load TrueType fonts if they exist
+            # Try to load BDF fonts if they exist
             if font_dir.exists():
+                # Map specific BDF fonts to size slots
+                font_mapping = {
+                    1: "4x6.bdf",          # Small
+                    2: "5x8.bdf",          # Medium
+                    3: "ter-u12n.bdf",     # Large
+                    4: "MatrixChunky8.bdf" # XLarge (will be scaled)
+                }
+
+                for size, filename in font_mapping.items():
+                    font_path = font_dir / filename
+                    if font_path.exists():
+                        try:
+                            self.fonts[size] = BDFFont(str(font_path))
+                            self.fonts_are_bdf[size] = True
+                            logging.info(f"Loaded BDF font size {size}: {filename}")
+                        except Exception as e:
+                            logging.warning(f"Could not load BDF font {filename}: {e}")
+
+                # Also try TTF fonts as fallback
                 ttf_files = list(font_dir.glob("*.ttf"))
                 if ttf_files:
-                    try:
-                        # Use first TTF font found with different sizes
-                        font_path = str(ttf_files[0])
-                        self.fonts[1] = ImageFont.truetype(font_path, 6)
-                        self.fonts[2] = ImageFont.truetype(font_path, 8)
-                        self.fonts[3] = ImageFont.truetype(font_path, 12)
-                        self.fonts[4] = ImageFont.truetype(font_path, 16)
-                        logging.info(f"Loaded TrueType font: {ttf_files[0].name}")
-                    except Exception as e:
-                        logging.warning(f"Could not load TTF font: {e}")
+                    for size in [1, 2, 3, 4]:
+                        if not self.fonts_are_bdf[size]:
+                            try:
+                                font_sizes = {1: 6, 2: 8, 3: 12, 4: 16}
+                                self.fonts[size] = ImageFont.truetype(str(ttf_files[0]), font_sizes[size])
+                                logging.info(f"Loaded TTF font for size {size}")
+                            except Exception as e:
+                                logging.warning(f"Could not load TTF font for size {size}: {e}")
 
         except Exception as e:
             logging.warning(f"Font loading error: {e}")
@@ -142,13 +202,21 @@ class DisplayManager:
             font = self.fonts.get(size, self.fonts[2])
             color = palette.get(color_idx, (255, 255, 255))
 
-            # Calculate x position for centering
-            bbox = draw.textbbox((0, 0), text, font=font)
-            text_width = bbox[2] - bbox[0]
-            x_pos = (self.config.display_width - text_width) // 2
+            # Check if this is a BDF font or regular PIL font
+            is_bdf = self.fonts_are_bdf.get(size, False)
 
-            # Draw text
-            draw.text((x_pos, y_pos), text, font=font, fill=color)
+            if is_bdf:
+                # BDF font - use custom draw method
+                bbox = font.getbbox(text)
+                text_width = bbox[2] - bbox[0]
+                x_pos = (self.config.display_width - text_width) // 2
+                font.draw_text(draw, (x_pos, y_pos), text, color)
+            else:
+                # Regular PIL font
+                bbox = draw.textbbox((0, 0), text, font=font)
+                text_width = bbox[2] - bbox[0]
+                x_pos = (self.config.display_width - text_width) // 2
+                draw.text((x_pos, y_pos), text, font=font, fill=color)
 
         # Display image
         self._show_image(img)
@@ -223,7 +291,10 @@ class DisplayManager:
         temp_text = f"{temp}F"
 
         font_large = self.fonts[3]
-        draw.text((1, 0), temp_text, font=font_large, fill=temp_color)
+        if self.fonts_are_bdf.get(3, False):
+            font_large.draw_text(draw, (1, 0), temp_text, temp_color)
+        else:
+            draw.text((1, 0), temp_text, font=font_large, fill=temp_color)
 
         # Additional weather info (smaller, bottom)
         feels = weather_data.get('feels_like', temp)
@@ -235,13 +306,22 @@ class DisplayManager:
         info_color = palette[1]  # White
 
         # Line 2: Feels like
-        draw.text((1, 11), f"FL:{feels}F", font=font_small, fill=info_color)
+        if self.fonts_are_bdf.get(1, False):
+            font_small.draw_text(draw, (1, 11), f"FL:{feels}F", info_color)
+        else:
+            draw.text((1, 11), f"FL:{feels}F", font=font_small, fill=info_color)
 
         # Line 3: Wind
-        draw.text((1, 18), f"W:{wind_dir} {wind_speed}", font=font_small, fill=info_color)
+        if self.fonts_are_bdf.get(1, False):
+            font_small.draw_text(draw, (1, 18), f"W:{wind_dir} {wind_speed}", info_color)
+        else:
+            draw.text((1, 18), f"W:{wind_dir} {wind_speed}", font=font_small, fill=info_color)
 
         # Line 4: Humidity
-        draw.text((1, 25), f"H:{humidity}%", font=font_small, fill=info_color)
+        if self.fonts_are_bdf.get(1, False):
+            font_small.draw_text(draw, (1, 25), f"H:{humidity}%", info_color)
+        else:
+            draw.text((1, 25), f"H:{humidity}%", font=font_small, fill=info_color)
 
         self._show_image(img)
 

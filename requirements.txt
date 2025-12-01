@@ -3,6 +3,7 @@ Pillow>=10.0.0
 PyYAML>=6.0
 adafruit-io>=2.7.0
 paho-mqtt>=1.6.1
+bdfparser>=2.2.0
 
 # System monitoring
 psutil>=5.9.0
