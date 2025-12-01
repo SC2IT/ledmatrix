@@ -186,6 +186,10 @@ class DisplayManager:
                 text_width = graphics.DrawText(self.canvas, font, -1000, y_pos, text_color, text)
                 x_pos = (self.config.display_width - text_width) // 2
 
+                # Manual horizontal offset for specific text
+                if text == "ON-CALL":
+                    x_pos += 1  # Move right by 1px
+
                 # Convert from top-left positioning to baseline positioning
                 # CircuitPython used anchor_point=(0.5, 0) where y is top of text
                 # graphics.DrawText() expects y to be the baseline
@@ -217,6 +221,11 @@ class DisplayManager:
                 bbox = draw.textbbox((0, 0), text, font=font)
                 text_width = bbox[2] - bbox[0]
                 x_pos = (self.config.display_width - text_width) // 2
+
+                # Manual horizontal offset for specific text
+                if text == "ON-CALL":
+                    x_pos += 1  # Move right by 1px
+
                 draw.text((x_pos, y_pos), text, font=font, fill=color)
 
             # Display image

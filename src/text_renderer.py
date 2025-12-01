@@ -187,8 +187,8 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
         # Mixed fonts - use custom layouts for common patterns
         if num_lines == 3 and font_sizes == [4, 3, 2]:
             # ON-CALL pattern: XLarge Bold (15px) + Large (8px) + Medium (8px)
-            # Total: 31px with 1px gap between lines 2 and 3
-            positions = [0, 15, 24]
+            # Urgent moved up 2px from 15 to 13
+            positions = [0, 13, 24]
         elif num_lines == 2 and font_sizes == [6, 3]:
             # FREE pattern: Huge (24px) + Large (8px)
             # Total: 32px - exactly fills display
