@@ -307,12 +307,17 @@ class DisplayManager:
                         icon = icon.convert('RGB')
 
                     # Draw icon pixel by pixel at top-right (x=40, y=0)
+                    # Boost brightness to compensate for 16-bit BMP dimness
                     for y in range(min(24, self.config.display_height)):
                         for x in range(24):
                             if x + 40 < self.config.display_width:
                                 r, g, b = icon.getpixel((x, y))
                                 # Only draw non-black pixels (transparent background)
                                 if r > 0 or g > 0 or b > 0:
+                                    # Boost brightness by 2x (cap at 255)
+                                    r = min(255, r * 2)
+                                    g = min(255, g * 2)
+                                    b = min(255, b * 2)
                                     self.canvas.SetPixel(x + 40, y, r, g, b)
                     logging.info("Weather icon drawn successfully")
                 except Exception as e:
