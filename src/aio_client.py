@@ -259,21 +259,36 @@ class WeatherClient:
         """MQTT weather message callback"""
         try:
             payload = msg.payload.decode('utf-8')
-            logging.debug(f"Weather data received ({len(payload)} bytes)")
+
+            # DEBUG: Show what we received
+            logging.info(f"=== WEATHER MQTT DEBUG ===")
+            logging.info(f"Topic: {msg.topic}")
+            logging.info(f"Payload size: {len(payload)} bytes")
+            logging.info(f"Raw payload: {payload[:500]}...")  # First 500 chars
 
             # Parse JSON
             data = json.loads(payload)
+
+            # DEBUG: Show parsed structure
+            logging.info(f"Parsed JSON keys: {list(data.keys())}")
+            logging.info(f"Full JSON: {json.dumps(data, indent=2)[:1000]}...")  # First 1000 chars pretty-printed
 
             # Extract weather data from 'current' object
             current = data.get('current', {})
             if not current:
                 logging.warning("Weather data missing 'current' object")
+                logging.warning(f"Available keys in data: {list(data.keys())}")
                 return
+
+            logging.info(f"'current' object keys: {list(current.keys())}")
 
             temp_c = current.get('temperature')
             if temp_c is None:
                 logging.warning("Weather data missing temperature")
+                logging.warning(f"Available keys in current: {list(current.keys())}")
                 return
+
+            logging.info(f"Extracted temperature: {temp_c}°C")
 
             feels_c = current.get('temperatureApparent', temp_c)
             condition = current.get('conditionCode', 'Clear')
