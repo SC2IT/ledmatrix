@@ -318,8 +318,8 @@ class WeatherClient:
                 'condition': condition
             }
 
-            # Update day/night mode
-            self.config.set_night_mode(not daylight)
+            # Update day/night mode - DISABLED (causes artifacts)
+            # self.config.set_night_mode(not daylight)
 
             logging.info(f"Weather updated: {temp_f}°F, {condition}, Night={not daylight}")
 

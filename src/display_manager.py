@@ -373,31 +373,54 @@ class DisplayManager:
                 pass
 
     def _get_weather_icon_path(self, condition: str, is_night: bool) -> Optional[Path]:
-        """Get path to weather icon file"""
+        """Get path to weather icon file using Tomorrow.io naming convention"""
         icon_dir = Path(__file__).parent.parent / "icons"
 
         if not icon_dir.exists():
             return None
 
-        # Map condition to icon filename (simplified)
+        # Map Apple WeatherKit condition codes to Tomorrow.io icon codes
+        # Format: {code}{night_flag}_{description}_small.bmp
+        # Night flag: 1 suffix for night (e.g., 10001 for clear night)
         icon_map = {
-            "Clear": "clear",
-            "MostlyClear": "mostly_clear",
-            "PartlyCloudy": "partly_cloudy",
-            "Cloudy": "cloudy",
-            "Rain": "rain",
-            "Snow": "snow",
-            "Thunderstorms": "tstorm",
+            "Clear": "1000_clear_sunny",
+            "MostlyClear": "1100_mostly_clear",
+            "PartlyCloudy": "1101_partly_cloudy",
+            "MostlyCloudy": "1102_mostly_cloudy",
+            "Cloudy": "1001_cloudy",
+            "Fog": "2000_fog",
+            "LightFog": "2100_fog_light",
+            "Drizzle": "4000_drizzle",
+            "Rain": "4001_rain",
+            "LightRain": "4200_rain_light",
+            "HeavyRain": "4201_rain_heavy",
+            "Snow": "5000_snow",
+            "Flurries": "5001_flurries",
+            "LightSnow": "5100_snow_light",
+            "HeavySnow": "5101_snow_heavy",
+            "FreezingDrizzle": "6000_freezing_rain_drizzle",
+            "FreezingRain": "6001_freezing_rain",
+            "LightFreezingRain": "6200_freezing_rain_light",
+            "HeavyFreezingRain": "6201_freezing_rain_heavy",
+            "IcePellets": "7000_ice_pellets",
+            "HeavyIcePellets": "7101_ice_pellets_heavy",
+            "LightIcePellets": "7102_ice_pellets_light",
+            "Thunderstorms": "8000_tstorm",
         }
 
-        icon_base = icon_map.get(condition, "clear")
-        suffix = "_night" if is_night else ""
+        icon_base = icon_map.get(condition, "1000_clear_sunny")
 
-        # Try PNG first, then BMP
-        for ext in ['.png', '.bmp']:
-            icon_path = icon_dir / f"{icon_base}{suffix}{ext}"
-            if icon_path.exists():
-                return icon_path
+        # Add night suffix if nighttime (1 gets appended to code)
+        if is_night:
+            # Insert '1' before the underscore (e.g., "1000" -> "10001")
+            parts = icon_base.split('_', 1)
+            icon_base = f"{parts[0]}1_{parts[1]}"
+
+        # Icons are BMP files with _small suffix
+        icon_path = icon_dir / f"{icon_base}_small.bmp"
+
+        if icon_path.exists():
+            return icon_path
 
         return None
 
