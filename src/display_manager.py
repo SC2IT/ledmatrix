@@ -303,11 +303,9 @@ class DisplayManager:
         temp_color = palette.get(weather_data.get('temp_color', 1), (255, 255, 255))
         temp_text = f"{temp}F"
 
-        font_large = self.fonts[3]
-        if self.fonts_are_bdf.get(3, False):
-            font_large.draw_text(img, (1, 0), temp_text, temp_color)
-        else:
-            draw.text((1, 0), temp_text, font=font_large, fill=temp_color)
+        # Use PIL default font for weather display (BDF fonts don't work with PIL Image rendering)
+        font_large = ImageFont.load_default()
+        draw.text((1, 0), temp_text, font=font_large, fill=temp_color)
 
         # Additional weather info (smaller, bottom)
         feels = weather_data.get('feels_like', temp)
@@ -315,26 +313,17 @@ class DisplayManager:
         wind_dir = weather_data.get('wind_dir', 'N')
         humidity = weather_data.get('humidity', 0)
 
-        font_small = self.fonts[1]
+        font_small = ImageFont.load_default()
         info_color = palette[1]  # White
 
         # Line 2: Feels like
-        if self.fonts_are_bdf.get(1, False):
-            font_small.draw_text(img, (1, 11), f"FL:{feels}F", info_color)
-        else:
-            draw.text((1, 11), f"FL:{feels}F", font=font_small, fill=info_color)
+        draw.text((1, 11), f"FL:{feels}F", font=font_small, fill=info_color)
 
         # Line 3: Wind
-        if self.fonts_are_bdf.get(1, False):
-            font_small.draw_text(img, (1, 18), f"W:{wind_dir} {wind_speed}", info_color)
-        else:
-            draw.text((1, 18), f"W:{wind_dir} {wind_speed}", font=font_small, fill=info_color)
+        draw.text((1, 18), f"W:{wind_dir} {wind_speed}", font=font_small, fill=info_color)
 
         # Line 4: Humidity
-        if self.fonts_are_bdf.get(1, False):
-            font_small.draw_text(img, (1, 25), f"H:{humidity}%", info_color)
-        else:
-            draw.text((1, 25), f"H:{humidity}%", font=font_small, fill=info_color)
+        draw.text((1, 25), f"H:{humidity}%", font=font_small, fill=info_color)
 
         self._show_image(img)
 
