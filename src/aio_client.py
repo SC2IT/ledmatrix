@@ -273,30 +273,23 @@ class WeatherClient:
             logging.info(f"Parsed JSON keys: {list(data.keys())}")
             logging.info(f"Full JSON: {json.dumps(data, indent=2)[:1000]}...")  # First 1000 chars pretty-printed
 
-            # Extract weather data from 'current' object
-            current = data.get('current', {})
-            if not current:
-                logging.warning("Weather data missing 'current' object")
-                logging.warning(f"Available keys in data: {list(data.keys())}")
-                return
-
-            logging.info(f"'current' object keys: {list(current.keys())}")
-
-            temp_c = current.get('temperature')
+            # Extract weather data directly from top level
+            # Note: Adafruit IO weather integration sends data at top level, not nested in 'current'
+            temp_c = data.get('temperature')
             if temp_c is None:
                 logging.warning("Weather data missing temperature")
-                logging.warning(f"Available keys in current: {list(current.keys())}")
+                logging.warning(f"Available keys in data: {list(data.keys())}")
                 return
 
             logging.info(f"Extracted temperature: {temp_c}°C")
 
-            feels_c = current.get('temperatureApparent', temp_c)
-            condition = current.get('conditionCode', 'Clear')
-            daylight = current.get('daylight', True)
-            wind_ms = current.get('windSpeed', 0)
-            wind_dir = current.get('windDirection', 0)
-            humidity = current.get('humidity', 0) * 100
-            pressure_hpa = current.get('pressure', 1013.25)
+            feels_c = data.get('temperatureApparent', temp_c)
+            condition = data.get('conditionCode', 'Clear')
+            daylight = data.get('daylight', True)
+            wind_ms = data.get('windSpeed', 0)
+            wind_dir = data.get('windDirection', 0)
+            humidity = data.get('humidity', 0) * 100
+            pressure_hpa = data.get('pressure', 1013.25)
 
             # Convert to imperial
             temp_f = round(temp_c * 9 / 5 + 32)
