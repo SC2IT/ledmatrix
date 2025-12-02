@@ -239,9 +239,9 @@ class WeatherClient:
             self.mqtt_connected = True
             logging.info("Connected to Weather MQTT")
 
-            # Subscribe to weather feed
+            # Subscribe to weather feed (integration path)
             location_id = self.config.weather_location_id
-            weather_topic = f"{self.config.aio_username}/feeds/weather.{location_id}.current"
+            weather_topic = f"{self.config.aio_username}/integration/weather/{location_id}/current"
             client.subscribe(weather_topic)
             logging.info(f"Subscribed to weather: {weather_topic}")
 
