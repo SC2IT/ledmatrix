@@ -84,8 +84,9 @@ class DisplayManager:
                 4: ImageFont.load_default(),
                 5: ImageFont.load_default(),
                 6: ImageFont.load_default(),
+                7: ImageFont.load_default(),
             }
-            self.fonts_are_bdf = {1: False, 2: False, 3: False, 4: False, 5: False, 6: False}
+            self.fonts_are_bdf = {1: False, 2: False, 3: False, 4: False, 5: False, 6: False, 7: False}
 
             # Font ascent values for BDF fonts (converts top-left to baseline positioning)
             # graphics.DrawText() uses baseline, CircuitPython used top-left anchor
@@ -93,22 +94,24 @@ class DisplayManager:
                 1: 5,   # 4x6.bdf ascent
                 2: 7,   # 5x8.bdf ascent
                 3: 10,  # ter-u12n.bdf ascent
-                4: 12,  # 9x15.bdf ascent
+                4: 12,  # 9x15B.bdf ascent
                 5: 16,  # 10x20.bdf ascent
-                6: 19,  # texgyre-27.bdf ascent
+                6: 17,  # ter-u22n.bdf ascent
+                7: 19,  # texgyre-27.bdf ascent
             }
 
             # Try to load BDF fonts using native graphics.Font() if available
             if font_dir.exists() and MATRIX_AVAILABLE:
                 # Map specific BDF fonts to size slots
-                # Sizes 4-6 provide graduated large font options
+                # Sizes 4-7 provide graduated large font options
                 font_mapping = {
                     1: "4x6.bdf",          # Small (6px)
                     2: "5x8.bdf",          # Medium (8px)
                     3: "ter-u12n.bdf",     # Large (12px)
-                    4: "9x15B.bdf",        # XLarge Bold (15px) - fits ON-CALL preset
+                    4: "9x15B.bdf",        # XLarge Bold (15px) - for ON-CALL preset
                     5: "10x20.bdf",        # XXLarge (20px)
-                    6: "texgyre-27.bdf",   # Huge (24px) - for FREE preset
+                    6: "ter-u22n.bdf",     # Huge (22px) - for QUIET preset
+                    7: "texgyre-27.bdf",   # Massive (24px) - for FREE preset
                 }
 
                 for size, filename in font_mapping.items():
@@ -127,10 +130,10 @@ class DisplayManager:
                 # Also try TTF fonts as fallback for sizes not loaded
                 ttf_files = list(font_dir.glob("*.ttf"))
                 if ttf_files:
-                    for size in [1, 2, 3, 4, 5, 6]:
+                    for size in [1, 2, 3, 4, 5, 6, 7]:
                         if not self.fonts_are_bdf[size]:
                             try:
-                                font_sizes = {1: 6, 2: 8, 3: 12, 4: 15, 5: 20, 6: 24}
+                                font_sizes = {1: 6, 2: 8, 3: 12, 4: 15, 5: 20, 6: 22, 7: 24}
                                 self.fonts[size] = ImageFont.truetype(str(ttf_files[0]), font_sizes[size])
                                 logging.info(f"Loaded TTF font for size {size}")
                             except Exception as e:
@@ -242,7 +245,7 @@ class DisplayManager:
 
         preset_map = {
             "ON-CALL": [(2, 4, "ON-CALL"), (1, 3, "Urgent"), (1, 2, "Needs Only")],
-            "FREE": [(3, 6, "FREE"), (1, 3, "But Knock")],
+            "FREE": [(3, 7, "FREE"), (1, 3, "But Knock")],
             "BUSY": [(2, 3, "BUSY"), (2, 3, "DO NOT"), (2, 3, "ENTER")],
             "QUIET": [(9, 6, "QUIET"), (22, 2, "MEETING IN"), (22, 2, "PROGRESS")],
             "KNOCK": [(9, 4, "KNOCK"), (22, 2, "MEETING IN"), (22, 2, "PROGRESS")],

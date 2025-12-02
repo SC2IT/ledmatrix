@@ -51,7 +51,7 @@ class TextParser:
 
                         # Validate ranges
                         color_index = max(0, min(27, color_index))  # 0-27 palette
-                        font_size = max(1, min(6, font_size))  # 1-6 font sizes
+                        font_size = max(1, min(7, font_size))  # 1-7 font sizes
 
                         parsed.append((color_index, font_size, text_part))
                     else:
@@ -100,8 +100,8 @@ class TextParser:
                     if color_index < 0 or color_index > 27:
                         issues.append(f"Line {i + 1}: Color {color_index} out of range (0-27)")
 
-                    if font_size < 1 or font_size > 6:
-                        issues.append(f"Line {i + 1}: Font size {font_size} out of range (1-6)")
+                    if font_size < 1 or font_size > 7:
+                        issues.append(f"Line {i + 1}: Font size {font_size} out of range (1-7)")
 
                 except (ValueError, IndexError):
                     issues.append(f"Line {i + 1}: Invalid format")
@@ -115,9 +115,10 @@ FONT_SIZES = {
     1: 6,   # Small - 4x6.bdf
     2: 8,   # Medium - 5x8.bdf
     3: 8,   # Large - ter-u12n.bdf (visual height 8px in uniform layouts)
-    4: 15,  # XLarge - 9x15.bdf (fits ON-CALL preset)
+    4: 15,  # XLarge - 9x15B.bdf (for ON-CALL preset)
     5: 20,  # XXLarge - 10x20.bdf
-    6: 24,  # Huge - texgyre-27.bdf (for FREE preset)
+    6: 22,  # Huge - ter-u22n.bdf (for QUIET preset)
+    7: 24,  # Massive - texgyre-27.bdf (for FREE preset)
 }
 
 
@@ -156,8 +157,8 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
         size = parsed_lines[0][1]
 
         # Visual heights for spacing calculations
-        # Sizes 4-6 provide graduated large font options
-        visual_heights = {1: 6, 2: 8, 3: 8, 4: 15, 5: 20, 6: 24}
+        # Sizes 4-7 provide graduated large font options
+        visual_heights = {1: 6, 2: 8, 3: 8, 4: 15, 5: 20, 6: 22, 7: 24}
 
         # Row spacing between lines (matches CircuitPython)
         # Size 3 uses 3px spacing (line 103), sizes 1&2 use 2px (line 111)
@@ -189,8 +190,8 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
             # ON-CALL pattern: XLarge Bold (15px) + Large (8px) + Medium (8px)
             # Urgent moved up 3px from 15 to 12
             positions = [0, 12, 24]
-        elif num_lines == 2 and font_sizes == [6, 3]:
-            # FREE pattern: Huge (24px) + Large (actual 12px, visual 8px)
+        elif num_lines == 2 and font_sizes == [7, 3]:
+            # FREE pattern: Massive (24px) + Large (actual 12px, visual 8px)
             # FREE down 1px, But Knock up 1px for better balance
             positions = [2, 21]
         elif num_lines == 3 and font_sizes == [3, 3, 3]:
@@ -198,9 +199,9 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
             # Moved up 2px from CircuitPython [0, 11, 22] to prevent bottom clipping
             positions = [-2, 9, 20]
         elif num_lines == 3 and font_sizes == [6, 2, 2]:
-            # QUIET pattern: Huge top line (24px), medium lines at bottom
-            # QUIET takes up full top, bottom text stacked at bottom
-            positions = [0, 16, 24]
+            # QUIET pattern: Huge top line (22px), medium lines at bottom
+            # QUIET takes up most of top, bottom text stacked at bottom
+            positions = [0, 17, 25]
         elif num_lines == 3 and font_sizes == [4, 2, 2]:
             # KNOCK pattern: Large top line, two small lines at bottom
             # Bottom two lines close together, 1px from bottom
