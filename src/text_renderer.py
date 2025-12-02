@@ -117,7 +117,7 @@ FONT_SIZES = {
     3: 8,   # Large - ter-u12n.bdf (visual height 8px in uniform layouts)
     4: 15,  # XLarge - 9x15B.bdf (for ON-CALL preset)
     5: 20,  # XXLarge - 10x20.bdf
-    6: 22,  # Huge - ter-u22n.bdf (for QUIET preset)
+    6: 22,  # Huge Bold - ter-u22b.bdf (for QUIET preset)
     7: 24,  # Massive - texgyre-27.bdf (for FREE preset)
 }
 

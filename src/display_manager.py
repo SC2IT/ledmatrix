@@ -110,7 +110,7 @@ class DisplayManager:
                     3: "ter-u12n.bdf",     # Large (12px)
                     4: "9x15B.bdf",        # XLarge Bold (15px) - for ON-CALL preset
                     5: "10x20.bdf",        # XXLarge (20px)
-                    6: "ter-u22n.bdf",     # Huge (22px) - for QUIET preset
+                    6: "ter-u22b.bdf",     # Huge Bold (22px) - for QUIET preset
                     7: "texgyre-27.bdf",   # Massive (24px) - for FREE preset
                 }
 
