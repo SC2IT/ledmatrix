@@ -199,13 +199,15 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
             # Moved up 2px from CircuitPython [0, 11, 22] to prevent bottom clipping
             positions = [-2, 9, 20]
         elif num_lines == 3 and font_sizes == [6, 2, 2]:
-            # QUIET pattern: Huge Bold top line (22px), medium lines at bottom
-            # QUIET moved up 2px to -2 (top clip for tighter layout)
-            positions = [-2, 17, 25]
-        elif num_lines == 3 and font_sizes == [4, 2, 2]:
-            # KNOCK pattern: Large top line, two small lines at bottom
-            # Bottom two lines close together, 1px from bottom
-            positions = [0, 14, 23]
+            # QUIET/KNOCK pattern: Huge Bold top line (22px), medium lines at bottom
+            # Check first line text to differentiate
+            first_text = parsed_lines[0][2] if parsed_lines else ""
+            if first_text == "KNOCK":
+                # KNOCK: 1px lower than QUIET
+                positions = [-1, 17, 25]
+            else:
+                # QUIET: moved up 2px to -2 (top clip for tighter layout)
+                positions = [-2, 17, 25]
         else:
             # Default distribution
             positions = [2, 12, 22][:num_lines]
