@@ -244,7 +244,7 @@ class DisplayManager:
             "ON-CALL": [(2, 4, "ON-CALL"), (1, 3, "Urgent"), (1, 2, "Needs Only")],
             "FREE": [(3, 6, "FREE"), (1, 3, "But Knock")],
             "BUSY": [(2, 3, "BUSY"), (2, 3, "DO NOT"), (2, 3, "ENTER")],
-            "QUIET": [(9, 5, "QUIET"), (22, 1, "MEETING IN"), (22, 1, "PROGRESS")],
+            "QUIET": [(9, 6, "QUIET"), (22, 2, "MEETING IN"), (22, 2, "PROGRESS")],
             "KNOCK": [(9, 4, "KNOCK"), (22, 2, "MEETING IN"), (22, 2, "PROGRESS")],
         }
 

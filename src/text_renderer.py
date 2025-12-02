@@ -197,10 +197,10 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
             # BUSY pattern: Three large lines (adjusted for baseline positioning)
             # Moved up 2px from CircuitPython [0, 11, 22] to prevent bottom clipping
             positions = [-2, 9, 20]
-        elif num_lines == 3 and font_sizes == [5, 1, 1]:
-            # QUIET pattern: Very large top line (20px), two tiny lines at bottom
-            # QUIET takes up most space with 1px margins, bottom text close together
-            positions = [0, 20, 26]
+        elif num_lines == 3 and font_sizes == [6, 2, 2]:
+            # QUIET pattern: Huge top line (24px), medium lines at bottom
+            # QUIET takes up full top, bottom text stacked at bottom
+            positions = [0, 16, 24]
         elif num_lines == 3 and font_sizes == [4, 2, 2]:
             # KNOCK pattern: Large top line, two small lines at bottom
             # Bottom two lines close together, 1px from bottom
