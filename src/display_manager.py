@@ -283,71 +283,94 @@ class DisplayManager:
             logging.debug("Matrix not available - weather would be displayed")
             return
 
-        palette = self.config.get_palette()
+        try:
+            palette = self.config.get_palette()
 
-        # Clear canvas
-        self.canvas.Clear()
+            # Clear canvas
+            self.canvas.Clear()
+            logging.debug(f"Rendering weather: condition={condition}, is_night={weather_data.get('is_night', False)}")
 
-        # Try to load and draw weather icon
-        icon_path = self._get_weather_icon_path(condition, weather_data.get('is_night', False))
-        if icon_path and icon_path.exists():
+            # Try to load and draw weather icon
+            icon_path = self._get_weather_icon_path(condition, weather_data.get('is_night', False))
+            logging.debug(f"Weather icon path: {icon_path}")
+
+            if icon_path and icon_path.exists():
+                try:
+                    logging.info(f"Loading weather icon: {icon_path}")
+                    icon = Image.open(icon_path)
+                    # Resize if needed (assuming icons are 24x24)
+                    if icon.size != (24, 24):
+                        icon = icon.resize((24, 24))
+
+                    # Convert to RGB if needed
+                    if icon.mode != 'RGB':
+                        icon = icon.convert('RGB')
+
+                    # Draw icon pixel by pixel at top-right (x=40, y=0)
+                    for y in range(min(24, self.config.display_height)):
+                        for x in range(24):
+                            if x + 40 < self.config.display_width:
+                                r, g, b = icon.getpixel((x, y))
+                                # Only draw non-black pixels (transparent background)
+                                if r > 0 or g > 0 or b > 0:
+                                    self.canvas.SetPixel(x + 40, y, r, g, b)
+                    logging.info("Weather icon drawn successfully")
+                except Exception as e:
+                    logging.error(f"Error loading weather icon: {e}", exc_info=True)
+            else:
+                logging.warning(f"Weather icon not found: {icon_path}")
+
+            # Get BDF fonts
+            font_large = self.fonts.get(3, self.fonts[2])  # Size 3 for temperature
+            font_small = self.fonts.get(1, self.fonts[2])  # Size 1 for details
+
+            # Check if fonts are BDF
+            if not self.fonts_are_bdf.get(3, False) or not self.fonts_are_bdf.get(1, False):
+                logging.warning("BDF fonts not loaded, weather display may not render correctly")
+
+            # Temperature (large, left side)
+            temp = weather_data.get('temp', 0)
+            temp_color = palette.get(weather_data.get('temp_color', 1), (255, 255, 255))
+            temp_text = f"{temp}F"
+
+            temp_graphics_color = graphics.Color(temp_color[0], temp_color[1], temp_color[2])
+            baseline_y = 0 + self.font_ascents.get(3, 10)  # Convert top-left to baseline
+            graphics.DrawText(self.canvas, font_large, 1, baseline_y, temp_graphics_color, temp_text)
+
+            # Additional weather info (smaller, bottom)
+            feels = weather_data.get('feels_like', temp)
+            wind_speed = weather_data.get('wind_speed', 0)
+            wind_dir = weather_data.get('wind_dir', 'N')
+            humidity = weather_data.get('humidity', 0)
+            pressure = weather_data.get('pressure', 0)
+
+            info_color = palette[1]  # White
+            info_graphics_color = graphics.Color(info_color[0], info_color[1], info_color[2])
+
+            # Line 2: Feels like (y=12)
+            baseline_y2 = 12 + self.font_ascents.get(1, 5)
+            graphics.DrawText(self.canvas, font_small, 1, baseline_y2, info_graphics_color, f"FL:{feels}F")
+
+            # Line 3: Wind & Humidity (y=19)
+            baseline_y3 = 19 + self.font_ascents.get(1, 5)
+            graphics.DrawText(self.canvas, font_small, 1, baseline_y3, info_graphics_color, f"W:{wind_dir}{wind_speed} H:{humidity}%")
+
+            # Line 4: Pressure (y=26)
+            baseline_y4 = 26 + self.font_ascents.get(1, 5)
+            graphics.DrawText(self.canvas, font_small, 1, baseline_y4, info_graphics_color, f"P:{pressure}")
+
+            logging.debug("Weather text rendered, swapping canvas")
+            # Swap canvas to display
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            logging.info("Weather display updated successfully")
+
+        except Exception as e:
+            logging.error(f"Error in show_weather: {e}", exc_info=True)
+            # Try to clear and show error message
             try:
-                icon = Image.open(icon_path)
-                # Resize if needed (assuming icons are 24x24)
-                if icon.size != (24, 24):
-                    icon = icon.resize((24, 24))
-
-                # Convert to RGB if needed
-                if icon.mode != 'RGB':
-                    icon = icon.convert('RGB')
-
-                # Draw icon pixel by pixel at top-right (x=40, y=0)
-                for y in range(min(24, self.config.display_height)):
-                    for x in range(24):
-                        if x + 40 < self.config.display_width:
-                            r, g, b = icon.getpixel((x, y))
-                            # Only draw non-black pixels (transparent background)
-                            if r > 0 or g > 0 or b > 0:
-                                self.canvas.SetPixel(x + 40, y, r, g, b)
-            except Exception as e:
-                logging.warning(f"Could not load weather icon: {e}")
-
-        # Get BDF fonts
-        font_large = self.fonts.get(3, self.fonts[2])  # Size 3 for temperature
-        font_small = self.fonts.get(1, self.fonts[2])  # Size 1 for details
-
-        # Temperature (large, left side)
-        temp = weather_data.get('temp', 0)
-        temp_color = palette.get(weather_data.get('temp_color', 1), (255, 255, 255))
-        temp_text = f"{temp}F"
-
-        temp_graphics_color = graphics.Color(temp_color[0], temp_color[1], temp_color[2])
-        baseline_y = 0 + self.font_ascents.get(3, 10)  # Convert top-left to baseline
-        graphics.DrawText(self.canvas, font_large, 1, baseline_y, temp_graphics_color, temp_text)
-
-        # Additional weather info (smaller, bottom)
-        feels = weather_data.get('feels_like', temp)
-        wind_speed = weather_data.get('wind_speed', 0)
-        wind_dir = weather_data.get('wind_dir', 'N')
-        humidity = weather_data.get('humidity', 0)
-
-        info_color = palette[1]  # White
-        info_graphics_color = graphics.Color(info_color[0], info_color[1], info_color[2])
-
-        # Line 2: Feels like (y=11)
-        baseline_y2 = 11 + self.font_ascents.get(1, 5)
-        graphics.DrawText(self.canvas, font_small, 1, baseline_y2, info_graphics_color, f"FL:{feels}F")
-
-        # Line 3: Wind (y=18)
-        baseline_y3 = 18 + self.font_ascents.get(1, 5)
-        graphics.DrawText(self.canvas, font_small, 1, baseline_y3, info_graphics_color, f"W:{wind_dir} {wind_speed}")
-
-        # Line 4: Humidity (y=25)
-        baseline_y4 = 25 + self.font_ascents.get(1, 5)
-        graphics.DrawText(self.canvas, font_small, 1, baseline_y4, info_graphics_color, f"H:{humidity}%")
-
-        # Swap canvas to display
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                self.show_simple_message("Weather", "Error")
+            except:
+                pass
 
     def _get_weather_icon_path(self, condition: str, is_night: bool) -> Optional[Path]:
         """Get path to weather icon file"""
