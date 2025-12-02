@@ -259,29 +259,17 @@ class WeatherClient:
         """MQTT weather message callback"""
         try:
             payload = msg.payload.decode('utf-8')
-
-            # DEBUG: Show what we received
-            logging.info(f"=== WEATHER MQTT DEBUG ===")
-            logging.info(f"Topic: {msg.topic}")
-            logging.info(f"Payload size: {len(payload)} bytes")
-            logging.info(f"Raw payload: {payload[:500]}...")  # First 500 chars
+            logging.debug(f"Weather MQTT received on {msg.topic}")
 
             # Parse JSON
             data = json.loads(payload)
-
-            # DEBUG: Show parsed structure
-            logging.info(f"Parsed JSON keys: {list(data.keys())}")
-            logging.info(f"Full JSON: {json.dumps(data, indent=2)[:1000]}...")  # First 1000 chars pretty-printed
 
             # Extract weather data directly from top level
             # Note: Adafruit IO weather integration sends data at top level, not nested in 'current'
             temp_c = data.get('temperature')
             if temp_c is None:
                 logging.warning("Weather data missing temperature")
-                logging.warning(f"Available keys in data: {list(data.keys())}")
                 return
-
-            logging.info(f"Extracted temperature: {temp_c}°C")
 
             feels_c = data.get('temperatureApparent', temp_c)
             condition = data.get('conditionCode', 'Clear')
