@@ -200,8 +200,8 @@ def calculate_layout(parsed_lines: List[Tuple[int, int, str]], display_height: i
             positions = [-2, 9, 20]
         elif num_lines == 3 and font_sizes == [6, 2, 2]:
             # QUIET pattern: Huge Bold top line (22px), medium lines at bottom
-            # QUIET moved up 1px to -1 (slight top clip for tighter layout)
-            positions = [-1, 17, 25]
+            # QUIET moved up 2px to -2 (top clip for tighter layout)
+            positions = [-2, 17, 25]
         elif num_lines == 3 and font_sizes == [4, 2, 2]:
             # KNOCK pattern: Large top line, two small lines at bottom
             # Bottom two lines close together, 1px from bottom
