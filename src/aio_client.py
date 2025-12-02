@@ -278,6 +278,7 @@ class WeatherClient:
             wind_dir = data.get('windDirection', 0)
             humidity = data.get('humidity', 0) * 100
             pressure_hpa = data.get('pressure', 1013.25)
+            pressure_trend = data.get('pressureTrend', 'steady')
 
             # Convert to imperial
             temp_f = round(temp_c * 9 / 5 + 32)
@@ -314,6 +315,7 @@ class WeatherClient:
                 'wind_dir': wind_dir_str,
                 'humidity': round(humidity),
                 'pressure': pressure_inhg,
+                'pressure_trend': pressure_trend,
                 'is_night': not daylight,
                 'condition': condition
             }

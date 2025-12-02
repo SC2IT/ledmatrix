@@ -372,6 +372,34 @@ class DisplayManager:
             baseline_y4 = 24 + self.font_ascents.get(2, 7)
             graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y4, humidity_graphics_color, f"RH{humidity}%")
 
+            # Pressure with trend arrow - right-aligned on same line as humidity
+            pressure = weather_data.get('pressure', 0)
+            pressure_trend = weather_data.get('pressure_trend', 'steady')
+
+            # Map trend to arrow
+            trend_arrows = {'rising': '↑', 'falling': '↓', 'steady': '→'}
+            arrow = trend_arrows.get(pressure_trend.lower(), '→')
+
+            # Draw pressure value with arrow (size 2) - measure width first
+            pressure_text = f"{arrow}{pressure:.2f}"
+            # Draw offscreen to measure
+            pressure_width = graphics.DrawText(self.canvas, self.fonts.get(2, font_small), -1000, baseline_y4, humidity_graphics_color, pressure_text)
+
+            # Draw "in" (size 1) - measure width
+            font_tiny = self.fonts.get(1, font_small)
+            in_width = graphics.DrawText(self.canvas, font_tiny, -1000, baseline_y4 + 2, humidity_graphics_color, "in")
+
+            # Calculate right-aligned position (total width of both elements)
+            total_width = pressure_width + in_width
+            pressure_x = self.config.display_width - total_width - 1  # 1px margin from right
+
+            # Draw pressure value and arrow
+            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), pressure_x, baseline_y4, humidity_graphics_color, pressure_text)
+
+            # Draw "in" in smaller font (size 1) right after pressure value
+            in_x = pressure_x + pressure_width
+            graphics.DrawText(self.canvas, font_tiny, in_x, baseline_y4 + 2, humidity_graphics_color, "in")
+
             logging.debug("Weather text rendered, swapping canvas")
             # Swap canvas to display
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
