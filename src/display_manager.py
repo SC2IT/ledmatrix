@@ -333,36 +333,44 @@ class DisplayManager:
             if not self.fonts_are_bdf.get(3, False) or not self.fonts_are_bdf.get(1, False):
                 logging.warning("BDF fonts not loaded, weather display may not render correctly")
 
-            # Temperature (large, left side)
+            # Temperature (large, left side) - matches CircuitPython layout
             temp = weather_data.get('temp', 0)
             temp_color = palette.get(weather_data.get('temp_color', 1), (255, 255, 255))
-            temp_text = f"{temp}F"
+            temp_str = str(temp)
 
             temp_graphics_color = graphics.Color(temp_color[0], temp_color[1], temp_color[2])
             baseline_y = 0 + self.font_ascents.get(3, 10)  # Convert top-left to baseline
-            graphics.DrawText(self.canvas, font_large, 1, baseline_y, temp_graphics_color, temp_text)
 
-            # Additional weather info (smaller, bottom)
+            # Draw temperature number
+            temp_width = graphics.DrawText(self.canvas, font_large, 1, baseline_y, temp_graphics_color, temp_str)
+
+            # Draw "F" after temperature (positioned dynamically based on temp digits)
+            f_x = 1 + len(temp_str) * 7 + 2
+            graphics.DrawText(self.canvas, font_large, f_x, baseline_y, temp_graphics_color, "F")
+
+            # Additional weather info (smaller, bottom) - matches CircuitPython positions
             feels = weather_data.get('feels_like', temp)
+            feels_color = palette.get(weather_data.get('feels_like_color', 1), (255, 255, 255))
             wind_speed = weather_data.get('wind_speed', 0)
             wind_dir = weather_data.get('wind_dir', 'N')
             humidity = weather_data.get('humidity', 0)
-            pressure = weather_data.get('pressure', 0)
 
-            info_color = palette[1]  # White
-            info_graphics_color = graphics.Color(info_color[0], info_color[1], info_color[2])
+            # Line 2: Feels like (y=10) - feels_like colored
+            feels_graphics_color = graphics.Color(feels_color[0], feels_color[1], feels_color[2])
+            baseline_y2 = 10 + self.font_ascents.get(2, 7)
+            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y2, feels_graphics_color, f"FL{feels}F")
 
-            # Line 2: Feels like (y=12)
-            baseline_y2 = 12 + self.font_ascents.get(1, 5)
-            graphics.DrawText(self.canvas, font_small, 1, baseline_y2, info_graphics_color, f"FL:{feels}F")
+            # Line 3: Wind (y=17) - color 8 (orange)
+            wind_color = palette.get(8, (255, 165, 0))  # Orange
+            wind_graphics_color = graphics.Color(wind_color[0], wind_color[1], wind_color[2])
+            baseline_y3 = 17 + self.font_ascents.get(2, 7)
+            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y3, wind_graphics_color, f"{wind_dir}{wind_speed:02d}MPH")
 
-            # Line 3: Wind & Humidity (y=19)
-            baseline_y3 = 19 + self.font_ascents.get(1, 5)
-            graphics.DrawText(self.canvas, font_small, 1, baseline_y3, info_graphics_color, f"W:{wind_dir}{wind_speed} H:{humidity}%")
-
-            # Line 4: Pressure (y=26)
-            baseline_y4 = 26 + self.font_ascents.get(1, 5)
-            graphics.DrawText(self.canvas, font_small, 1, baseline_y4, info_graphics_color, f"P:{pressure}")
+            # Line 4: Humidity (y=24) - color 9 (pink/magenta)
+            humidity_color = palette.get(9, (255, 0, 255))  # Pink/Magenta
+            humidity_graphics_color = graphics.Color(humidity_color[0], humidity_color[1], humidity_color[2])
+            baseline_y4 = 24 + self.font_ascents.get(2, 7)
+            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y4, humidity_graphics_color, f"RH{humidity}%")
 
             logging.debug("Weather text rendered, swapping canvas")
             # Swap canvas to display
