@@ -123,7 +123,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=$USER
+User=root
 WorkingDirectory=$SCRIPT_DIR
 ExecStart=/usr/bin/python3 -m src.main
 Restart=always
