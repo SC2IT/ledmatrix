@@ -264,19 +264,24 @@ class WeatherClient:
             # Parse JSON
             data = json.loads(payload)
 
-            # Extract weather data
-            temp_c = data.get('temperature')
+            # Extract weather data from 'current' object
+            current = data.get('current', {})
+            if not current:
+                logging.warning("Weather data missing 'current' object")
+                return
+
+            temp_c = current.get('temperature')
             if temp_c is None:
                 logging.warning("Weather data missing temperature")
                 return
 
-            feels_c = data.get('temperatureApparent', temp_c)
-            condition = data.get('conditionCode', 'Clear')
-            daylight = data.get('daylight', True)
-            wind_ms = data.get('windSpeed', 0)
-            wind_dir = data.get('windDirection', 0)
-            humidity = data.get('humidity', 0) * 100
-            pressure_hpa = data.get('pressure', 1013.25)
+            feels_c = current.get('temperatureApparent', temp_c)
+            condition = current.get('conditionCode', 'Clear')
+            daylight = current.get('daylight', True)
+            wind_ms = current.get('windSpeed', 0)
+            wind_dir = current.get('windDirection', 0)
+            humidity = current.get('humidity', 0) * 100
+            pressure_hpa = current.get('pressure', 1013.25)
 
             # Convert to imperial
             temp_f = round(temp_c * 9 / 5 + 32)
