@@ -393,22 +393,26 @@ class DisplayManager:
             dec_width = graphics.DrawText(self.canvas, font_medium, -1000, baseline_y4, humidity_graphics_color, f"{pressure_dec:02d}")
             in_width = graphics.DrawText(self.canvas, font_tiny, -1000, baseline_y4 - 1, humidity_graphics_color, "in")
 
-            # Calculate total width and right-aligned position
-            total_width = arrow_int_width + period_width + dec_width + in_width
+            # Calculate total width with tighter decimal spacing (reduce gaps by 1px each)
+            leading_space = 2  # Space before arrow (away from %)
+            tighter_spacing = -1  # Negative to overlap/tighten
+            total_width = leading_space + arrow_int_width + period_width + tighter_spacing + dec_width + tighter_spacing + in_width
             pressure_x = self.config.display_width - total_width - 1  # 1px margin from right
 
+            # Add leading space
+            current_x = pressure_x + leading_space
+
             # Draw arrow + integer part (size 2)
-            current_x = pressure_x
             graphics.DrawText(self.canvas, font_medium, current_x, baseline_y4, humidity_graphics_color, f"{arrow}{pressure_int}")
             current_x += arrow_int_width
 
-            # Draw period (size 1 - smaller)
-            graphics.DrawText(self.canvas, font_tiny, current_x, baseline_y4, humidity_graphics_color, ".")
-            current_x += period_width
+            # Draw period (size 1 - smaller) with tighter spacing
+            graphics.DrawText(self.canvas, font_tiny, current_x + tighter_spacing, baseline_y4, humidity_graphics_color, ".")
+            current_x += period_width + tighter_spacing
 
-            # Draw decimal digits (size 2)
-            graphics.DrawText(self.canvas, font_medium, current_x, baseline_y4, humidity_graphics_color, f"{pressure_dec:02d}")
-            current_x += dec_width
+            # Draw decimal digits (size 2) with tighter spacing
+            graphics.DrawText(self.canvas, font_medium, current_x + tighter_spacing, baseline_y4, humidity_graphics_color, f"{pressure_dec:02d}")
+            current_x += dec_width + tighter_spacing
 
             # Draw "in" (size 1) moved up 3px from baseline
             graphics.DrawText(self.canvas, font_tiny, current_x, baseline_y4 - 1, humidity_graphics_color, "in")
