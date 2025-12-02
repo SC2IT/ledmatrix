@@ -380,25 +380,38 @@ class DisplayManager:
             trend_arrows = {'rising': '↑', 'falling': '↓', 'steady': '→'}
             arrow = trend_arrows.get(pressure_trend.lower(), '→')
 
-            # Draw pressure value with arrow (size 2) - measure width first
-            pressure_text = f"{arrow}{pressure:.2f}"
-            # Draw offscreen to measure
-            pressure_width = graphics.DrawText(self.canvas, self.fonts.get(2, font_small), -1000, baseline_y4, humidity_graphics_color, pressure_text)
+            # Split pressure into parts for smaller decimal point
+            pressure_int = int(pressure)
+            pressure_dec = int((pressure - pressure_int) * 100)  # Get 2 decimal places
 
-            # Draw "in" (size 1) - measure width
+            font_medium = self.fonts.get(2, font_small)
             font_tiny = self.fonts.get(1, font_small)
-            in_width = graphics.DrawText(self.canvas, font_tiny, -1000, baseline_y4 + 2, humidity_graphics_color, "in")
 
-            # Calculate right-aligned position (total width of both elements)
-            total_width = pressure_width + in_width
+            # Measure widths offscreen
+            arrow_int_width = graphics.DrawText(self.canvas, font_medium, -1000, baseline_y4, humidity_graphics_color, f"{arrow}{pressure_int}")
+            period_width = graphics.DrawText(self.canvas, font_tiny, -1000, baseline_y4, humidity_graphics_color, ".")
+            dec_width = graphics.DrawText(self.canvas, font_medium, -1000, baseline_y4, humidity_graphics_color, f"{pressure_dec:02d}")
+            in_width = graphics.DrawText(self.canvas, font_tiny, -1000, baseline_y4 - 1, humidity_graphics_color, "in")
+
+            # Calculate total width and right-aligned position
+            total_width = arrow_int_width + period_width + dec_width + in_width
             pressure_x = self.config.display_width - total_width - 1  # 1px margin from right
 
-            # Draw pressure value and arrow
-            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), pressure_x, baseline_y4, humidity_graphics_color, pressure_text)
+            # Draw arrow + integer part (size 2)
+            current_x = pressure_x
+            graphics.DrawText(self.canvas, font_medium, current_x, baseline_y4, humidity_graphics_color, f"{arrow}{pressure_int}")
+            current_x += arrow_int_width
 
-            # Draw "in" in smaller font (size 1) right after pressure value
-            in_x = pressure_x + pressure_width
-            graphics.DrawText(self.canvas, font_tiny, in_x, baseline_y4 + 2, humidity_graphics_color, "in")
+            # Draw period (size 1 - smaller)
+            graphics.DrawText(self.canvas, font_tiny, current_x, baseline_y4, humidity_graphics_color, ".")
+            current_x += period_width
+
+            # Draw decimal digits (size 2)
+            graphics.DrawText(self.canvas, font_medium, current_x, baseline_y4, humidity_graphics_color, f"{pressure_dec:02d}")
+            current_x += dec_width
+
+            # Draw "in" (size 1) moved up 3px from baseline
+            graphics.DrawText(self.canvas, font_tiny, current_x, baseline_y4 - 1, humidity_graphics_color, "in")
 
             logging.debug("Weather text rendered, swapping canvas")
             # Swap canvas to display
