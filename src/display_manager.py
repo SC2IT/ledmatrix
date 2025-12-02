@@ -248,7 +248,7 @@ class DisplayManager:
             "FREE": [(3, 7, "FREE"), (1, 3, "But Knock")],
             "BUSY": [(2, 3, "BUSY"), (2, 3, "DO NOT"), (2, 3, "ENTER")],
             "QUIET": [(9, 6, "QUIET"), (22, 2, "MEETING IN"), (22, 2, "PROGRESS")],
-            "KNOCK": [(9, 4, "KNOCK"), (22, 2, "MEETING IN"), (22, 2, "PROGRESS")],
+            "KNOCK": [(4, 6, "KNOCK"), (22, 2, "MEETING IN"), (22, 2, "PROGRESS")],
         }
 
         if preset_name in preset_map:
