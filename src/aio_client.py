@@ -298,7 +298,7 @@ class WeatherClient:
                 progress = (t - 32) / 68.0
                 if progress < 0.4:
                     return 7  # Cyan
-                if progress < 0.6:
+                if progress <= 0.603:  # Adjusted to include 73°F as green
                     return 3  # Green
                 if progress < 0.8:
                     return 5  # Yellow
