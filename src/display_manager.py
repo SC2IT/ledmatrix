@@ -544,15 +544,14 @@ class DisplayManager:
         if not self.matrix:
             return
 
+        # Keep hardware brightness constant - only use color palette for dimming
+        # Hardware brightness reduction causes PWM instability
+        self.matrix.brightness = self.config.brightness
+
         if self.config._is_night:
-            # Night mode: 50% hardware brightness (in addition to 25% color palette)
-            target_brightness = int(self.config.brightness * 0.5)
-            self.matrix.brightness = target_brightness
-            logging.debug(f"Night mode: Set brightness to {target_brightness}% (50% of {self.config.brightness}%)")
+            logging.debug(f"Night mode: Using color palette dimming only (brightness stays at {self.config.brightness}%)")
         else:
-            # Day mode: Full configured brightness
-            self.matrix.brightness = self.config.brightness
-            logging.debug(f"Day mode: Set brightness to {self.config.brightness}%")
+            logging.debug(f"Day mode: Full brightness at {self.config.brightness}%")
 
     def __del__(self):
         """Cleanup on destruction"""
