@@ -108,15 +108,6 @@ class Config:
             logging.error(f"Error checking night time: {e}")
             return False
 
-    def get_brightness(self):
-        """Get current brightness based on day/night mode"""
-        schedule = self.data.get('schedule', {})
-
-        if self.is_night_time():
-            return schedule.get('night_brightness', 40)
-        else:
-            return schedule.get('day_brightness', 100)
-
     # Convenience accessors
     @property
     def aio_username(self):

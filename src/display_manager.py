@@ -528,30 +528,10 @@ class DisplayManager:
         except Exception as e:
             logging.error(f"Error displaying image: {e}")
 
-    def set_brightness(self, brightness: int):
-        """
-        Set display brightness
-
-        Args:
-            brightness: Brightness level 0-100
-        """
-        if self.matrix:
-            self.matrix.brightness = max(0, min(100, brightness))
-            logging.debug(f"Set brightness to {brightness}")
-
     def sync_brightness_with_night_mode(self):
-        """Adjust hardware brightness based on day/night mode"""
-        if not self.matrix:
-            return
-
-        # Keep hardware brightness constant - only use color palette for dimming
-        # Hardware brightness reduction causes PWM instability
-        self.matrix.brightness = self.config.brightness
-
-        if self.config._is_night:
-            logging.debug(f"Night mode: Using color palette dimming only (brightness stays at {self.config.brightness}%)")
-        else:
-            logging.debug(f"Day mode: Full brightness at {self.config.brightness}%")
+        """Ensure hardware brightness stays constant regardless of day/night mode"""
+        if self.matrix:
+            self.matrix.brightness = self.config.brightness
 
     def __del__(self):
         """Cleanup on destruction"""
