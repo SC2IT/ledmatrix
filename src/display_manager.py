@@ -161,6 +161,9 @@ class DisplayManager:
             self.clear()
             return
 
+        # Sync hardware brightness with day/night mode
+        self.sync_brightness_with_night_mode()
+
         # Get current palette
         palette = self.config.get_palette()
 
@@ -284,6 +287,9 @@ class DisplayManager:
             return
 
         try:
+            # Sync hardware brightness with day/night mode
+            self.sync_brightness_with_night_mode()
+
             palette = self.config.get_palette()
 
             # Clear canvas
@@ -532,6 +538,21 @@ class DisplayManager:
         if self.matrix:
             self.matrix.brightness = max(0, min(100, brightness))
             logging.debug(f"Set brightness to {brightness}")
+
+    def sync_brightness_with_night_mode(self):
+        """Adjust hardware brightness based on day/night mode"""
+        if not self.matrix:
+            return
+
+        if self.config._is_night:
+            # Night mode: 50% hardware brightness (in addition to 25% color palette)
+            target_brightness = int(self.config.brightness * 0.5)
+            self.matrix.brightness = target_brightness
+            logging.debug(f"Night mode: Set brightness to {target_brightness}% (50% of {self.config.brightness}%)")
+        else:
+            # Day mode: Full configured brightness
+            self.matrix.brightness = self.config.brightness
+            logging.debug(f"Day mode: Set brightness to {self.config.brightness}%")
 
     def __del__(self):
         """Cleanup on destruction"""
