@@ -340,7 +340,11 @@ class WeatherClient:
             }
 
             # Update day/night mode based on sunrise/sunset
+            was_night = self.config._is_night
             self.config.set_night_mode(is_night)
+
+            if was_night != is_night:
+                logging.info(f"Night mode changed: {was_night} -> {is_night}")
 
             logging.info(f"Weather updated: {temp_f}°F, {condition}, Night={is_night}")
 

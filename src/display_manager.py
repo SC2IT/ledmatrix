@@ -531,6 +531,8 @@ class DisplayManager:
     def sync_brightness_with_night_mode(self):
         """Ensure hardware brightness stays constant regardless of day/night mode"""
         if self.matrix:
+            palette_type = "NIGHT" if self.config._is_night else "DAY"
+            logging.info(f"sync_brightness: HW brightness={self.config.brightness}, Palette={palette_type}")
             self.matrix.brightness = self.config.brightness
 
     def __del__(self):
