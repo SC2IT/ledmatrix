@@ -8,7 +8,10 @@ import json
 import requests
 from typing import Optional, Callable
 from threading import Thread, Event
+from datetime import datetime
 import paho.mqtt.client as mqtt
+from astral import LocationInfo
+from astral.sun import sun
 
 
 class AIOClient:
@@ -273,12 +276,28 @@ class WeatherClient:
 
             feels_c = data.get('temperatureApparent', temp_c)
             condition = data.get('conditionCode', 'Clear')
-            daylight = data.get('daylight', True)
             wind_ms = data.get('windSpeed', 0)
             wind_dir = data.get('windDirection', 0)
             humidity = data.get('humidity', 0) * 100
             pressure_hpa = data.get('pressure', 1013.25)
             pressure_trend = data.get('pressureTrend', 'steady')
+
+            # Calculate day/night based on sunrise/sunset
+            metadata = data.get('metadata', {})
+            latitude = metadata.get('latitude', 39.03)
+            longitude = metadata.get('longitude', -94.68)
+
+            # Calculate sunrise/sunset for location
+            try:
+                location = LocationInfo(latitude=latitude, longitude=longitude)
+                s = sun(location.observer, date=datetime.now().date())
+                now = datetime.now(s['sunrise'].tzinfo)  # Use same timezone as sun times
+                is_night = now < s['sunrise'] or now > s['sunset']
+                logging.debug(f"Sunrise: {s['sunrise'].strftime('%H:%M')}, Sunset: {s['sunset'].strftime('%H:%M')}, Now: {now.strftime('%H:%M')}, Night: {is_night}")
+            except Exception as e:
+                logging.warning(f"Could not calculate sunrise/sunset: {e}")
+                # Fallback to weather data daylight field
+                is_night = not data.get('daylight', True)
 
             # Convert to imperial
             temp_f = round(temp_c * 9 / 5 + 32)
@@ -316,14 +335,14 @@ class WeatherClient:
                 'humidity': round(humidity),
                 'pressure': pressure_inhg,
                 'pressure_trend': pressure_trend,
-                'is_night': not daylight,
+                'is_night': is_night,
                 'condition': condition
             }
 
-            # Update day/night mode - DISABLED (causes artifacts)
-            # self.config.set_night_mode(not daylight)
+            # Update day/night mode based on sunrise/sunset
+            self.config.set_night_mode(is_night)
 
-            logging.info(f"Weather updated: {temp_f}°F, {condition}, Night={not daylight}")
+            logging.info(f"Weather updated: {temp_f}°F, {condition}, Night={is_night}")
 
             # Call callback
             if self.on_weather_callback:
