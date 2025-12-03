@@ -8,6 +8,14 @@ import logging
 from datetime import datetime, time as dt_time
 from pathlib import Path
 
+try:
+    from astral import LocationInfo
+    from astral.sun import sun
+    ASTRAL_AVAILABLE = True
+except ImportError:
+    ASTRAL_AVAILABLE = False
+    logging.warning("astral library not available - sunrise/sunset calculation disabled")
+
 
 class Config:
     """Application configuration manager"""
@@ -18,6 +26,7 @@ class Config:
         self._is_night = False
         self.load()
         self._init_palettes()
+        self._init_night_mode()
 
     def load(self):
         """Load configuration from YAML file"""
@@ -79,6 +88,31 @@ class Config:
     def get_palette(self):
         """Get current color palette based on day/night mode"""
         return self.night_palette if self._is_night else self.day_palette
+
+    def _init_night_mode(self):
+        """Calculate initial night mode at startup based on location and time"""
+        if not ASTRAL_AVAILABLE:
+            logging.warning("Cannot calculate initial night mode - astral library not available")
+            return
+
+        try:
+            # Get location from config (use weather location if available)
+            location_data = self.data.get('location', {})
+            latitude = location_data.get('latitude', 39.03)
+            longitude = location_data.get('longitude', -94.68)
+
+            # Calculate sunrise/sunset for today
+            location = LocationInfo(latitude=latitude, longitude=longitude)
+            s = sun(location.observer, date=datetime.now().date())
+            now = datetime.now(s['sunrise'].tzinfo)
+            is_night = now < s['sunrise'] or now > s['sunset']
+
+            self._is_night = is_night
+            logging.info(f"Initial night mode: {'NIGHT' if is_night else 'DAY'} (sunrise: {s['sunrise'].strftime('%H:%M')}, sunset: {s['sunset'].strftime('%H:%M')}, now: {now.strftime('%H:%M')})")
+
+        except Exception as e:
+            logging.error(f"Failed to calculate initial night mode: {e}")
+            self._is_night = False
 
     def set_night_mode(self, is_night):
         """Set day/night mode (called by weather module or scheduler)"""
