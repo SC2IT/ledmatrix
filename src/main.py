@@ -162,9 +162,7 @@ class LEDMatrixApp:
             condition = weather_data.get('condition', 'Clear')
             self.display.show_weather(weather_data, condition)
 
-        # Update brightness based on day/night
-        brightness = self.config.get_brightness()
-        self.display.set_brightness(brightness)
+        # Note: Hardware brightness is NOT changed - only color palette shifts for night mode
 
     def start(self):
         """Start the application"""
@@ -207,14 +205,13 @@ class LEDMatrixApp:
                     if message:
                         self._on_command_received(message)
 
-                # Update brightness based on time
+                # Update day/night mode based on time (colors/icons only, no brightness change)
                 if self.config.data.get('schedule', {}).get('enable_auto_dimming', True):
                     is_night = self.config.is_night_time()
                     if is_night != self.config._is_night:
                         self.config.set_night_mode(is_night)
-                        brightness = self.config.get_brightness()
-                        self.display.set_brightness(brightness)
-                        logging.info(f"Mode changed: {'Night' if is_night else 'Day'}, Brightness: {brightness}")
+                        # Note: Hardware brightness NOT changed - only color palette
+                        logging.info(f"Mode changed: {'Night' if is_night else 'Day'} (color palette only)")
 
                         # Refresh display if showing weather
                         if self.last_command and self.last_command.upper() == "WEATHER" and self.current_weather:
