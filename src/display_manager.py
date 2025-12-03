@@ -307,17 +307,21 @@ class DisplayManager:
                         icon = icon.convert('RGB')
 
                     # Draw icon pixel by pixel at top-right (x=40, y=0)
-                    # Boost brightness to compensate for 16-bit BMP dimness
+                    # Adjust brightness to match text (night palette is 25% = /4)
+                    # Day: 2x boost, Night: 2x * 0.25 = 0.5x to match night palette
+                    is_night = weather_data.get('is_night', False)
+                    brightness_multiplier = 0.5 if is_night else 2.0
+
                     for y in range(min(24, self.config.display_height)):
                         for x in range(24):
                             if x + 40 < self.config.display_width:
                                 r, g, b = icon.getpixel((x, y))
                                 # Only draw non-black pixels (transparent background)
                                 if r > 0 or g > 0 or b > 0:
-                                    # Boost brightness by 2x (cap at 255)
-                                    r = min(255, r * 2)
-                                    g = min(255, g * 2)
-                                    b = min(255, b * 2)
+                                    # Adjust brightness to match text
+                                    r = min(255, int(r * brightness_multiplier))
+                                    g = min(255, int(g * brightness_multiplier))
+                                    b = min(255, int(b * brightness_multiplier))
                                     self.canvas.SetPixel(x + 40, y, r, g, b)
                     logging.info("Weather icon drawn successfully")
                 except Exception as e:
