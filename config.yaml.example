@@ -24,12 +24,14 @@ display:
   height: 32
 
   # Hardware settings
-  gpio_slowdown: 4  # 0-4: Increase if flickering (4 recommended with sound enabled)
+  gpio_slowdown: 4  # 0-4: Increase if flickering (try 2 with hardware_pulse enabled)
   pwm_bits: 11      # 1-11: Color depth (11 = best quality, more CPU)
   brightness: 100   # 1-100: Global brightness
+  hardware_pulse: true  # true = enable hardware pulse (better display, disables sound)
+                        # false = disable hardware pulse (enables sound, may flicker)
 
   # Advanced options (usually don't need to change)
-  hardware_mapping: "adafruit-hat"  # For Adafruit RGB Matrix HAT
+  hardware_mapping: "adafruit-hat-pwm"  # For Adafruit RGB Matrix HAT with PWM
   rows: 32
   chain_length: 1
   parallel: 1

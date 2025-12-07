@@ -61,7 +61,11 @@ class DisplayManager:
 
         # Advanced options
         options.multiplexing = self.config.data['display'].get('multiplexing', 0)
-        options.disable_hardware_pulsing = True  # Required for sound support
+
+        # Hardware pulse (improves display quality but disables sound)
+        # When True: enables hardware pulse, disables sound
+        # When False: disables hardware pulse, enables sound support
+        options.disable_hardware_pulsing = not self.config.hardware_pulse
 
         try:
             self.matrix = RGBMatrix(options=options)

@@ -196,6 +196,11 @@ class Config:
         return self.data['display'].get('hardware_mapping', 'adafruit-hat-pwm')
 
     @property
+    def hardware_pulse(self):
+        """Enable hardware pulse generation (disables sound compatibility)"""
+        return self.data['display'].get('hardware_pulse', True)
+
+    @property
     def rtc_enabled(self):
         return self.data.get('rtc', {}).get('enabled', True)
 
