@@ -529,8 +529,9 @@ class DisplayManager:
             x_offset = panel['x']
             w = panel['width']
 
-            # Line 1: Time label (centered, white)
-            label_color = graphics.Color(255, 255, 255)
+            # Line 1: Time label (centered, from palette)
+            label_rgb = palette.get(1, (255, 255, 255))  # White (dimmed at night)
+            label_color = graphics.Color(label_rgb[0], label_rgb[1], label_rgb[2])
             label_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, label_color, panel['label'])
             label_x = x_offset + (w - label_w) // 2
             graphics.DrawText(self.canvas, font_tiny, label_x,
@@ -579,8 +580,9 @@ class DisplayManager:
             x_offset = panel['x']
             w = panel['width']
 
-            # Line 1: Day label (centered, white)
-            label_color = graphics.Color(255, 255, 255)
+            # Line 1: Day label (centered, from palette)
+            label_rgb = palette.get(1, (255, 255, 255))  # White (dimmed at night)
+            label_color = graphics.Color(label_rgb[0], label_rgb[1], label_rgb[2])
             label_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, label_color, panel['label'])
             label_x = x_offset + (w - label_w) // 2
             graphics.DrawText(self.canvas, font_tiny, label_x,

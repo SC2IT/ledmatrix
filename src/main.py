@@ -224,9 +224,8 @@ class LEDMatrixApp:
                 return
 
             # Update loading display
-            dots = "." * ((elapsed % 4))
-            remaining = max_wait - elapsed
-            self.display.show_simple_message("Loading", f"Weather{dots} {remaining}s")
+            dots = "." * ((elapsed % 4) + 1)
+            self.display.show_simple_message("Loading", f"Weather{dots}")
 
             time.sleep(check_interval)
             elapsed += check_interval
