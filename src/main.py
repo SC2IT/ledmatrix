@@ -46,6 +46,9 @@ class LEDMatrixApp:
         self.last_command = None
         self.current_weather = None
         self.running = False
+        self.forecast_mode_active = False
+        self.forecast_flip_timer = 0.0
+        self.last_loop_time = time.time()
 
         # Setup signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -124,23 +127,34 @@ class LEDMatrixApp:
 
             if cmd_upper in ["OFF", "BLANK", "SCREEN OFF"]:
                 logging.info("Clearing display")
+                self.forecast_mode_active = False
                 self.display.clear()
 
             elif cmd_upper == "WEATHER":
                 logging.info("Displaying weather")
+                self.forecast_mode_active = False
                 if self.current_weather:
                     condition = self.current_weather.get('condition', 'Clear')
                     self.display.show_weather(self.current_weather, condition)
                 else:
                     self.display.show_simple_message("Weather", "Waiting...")
 
+            elif cmd_upper == "FORECAST":
+                logging.info("Displaying forecast carousel")
+                self.forecast_mode_active = True
+                self.forecast_flip_timer = 0.0
+                self.last_loop_time = time.time()
+                # Initial display will happen in main loop
+
             elif cmd_upper in ["ON-CALL", "FREE", "BUSY", "QUIET", "KNOCK"]:
                 logging.info(f"Displaying preset: {cmd_upper}")
+                self.forecast_mode_active = False
                 self.display.show_preset(cmd_upper)
 
             else:
                 # Parse and display formatted text
                 logging.info("Displaying formatted text")
+                self.forecast_mode_active = False
                 parsed = self.parser.parse(command)
 
                 if parsed:
@@ -197,11 +211,36 @@ class LEDMatrixApp:
 
         while self.running:
             try:
+                # Calculate delta time
+                current_time = time.time()
+                delta_time = current_time - self.last_loop_time
+                self.last_loop_time = current_time
+
                 # Poll REST API if MQTT not connected (fallback)
                 if not self.aio_client.mqtt_connected and self.aio_client.rest_enabled:
                     message = self.aio_client.poll_rest_api()
                     if message:
                         self._on_command_received(message)
+
+                # Update forecast carousel if active
+                if self.forecast_mode_active:
+                    self.forecast_flip_timer += delta_time
+
+                    # Check if time to flip
+                    if self.forecast_flip_timer >= self.config.forecast_flip_interval:
+                        self.display.flip_carousel_view()
+                        self.forecast_flip_timer = 0.0
+
+                    # Render carousel
+                    hourly = self.weather_client.get_hourly_forecasts() if self.weather_client else {}
+                    daily = self.weather_client.get_daily_forecasts() if self.weather_client else {}
+
+                    self.display.show_forecast_carousel(
+                        self.current_weather or {},
+                        hourly,
+                        daily,
+                        self.forecast_flip_timer
+                    )
 
                 # Update day/night mode based on time
                 if self.config.data.get('schedule', {}).get('enable_auto_dimming', True):

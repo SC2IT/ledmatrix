@@ -203,6 +203,8 @@ class WeatherClient:
         self.mqtt_client = None
         self.mqtt_connected = False
         self.weather_data = None
+        self.forecast_hourly = {}  # Key: hours ahead (6, 12)
+        self.forecast_daily = {}   # Key: days ahead (0, 1, 2)
 
         # Initialize MQTT
         self._init_mqtt()
@@ -248,6 +250,18 @@ class WeatherClient:
             client.subscribe(weather_topic)
             logging.info(f"Subscribed to weather: {weather_topic}")
 
+            # Subscribe to hourly forecasts (6hr, 12hr)
+            for hours in [6, 12]:
+                topic = f"{self.config.aio_username}/integration/weather/{location_id}/forecast_hours_{hours}"
+                client.subscribe(topic)
+                logging.info(f"Subscribed to hourly forecast: {topic}")
+
+            # Subscribe to daily forecasts (today, tomorrow, day+2)
+            for days in [0, 1, 2]:
+                topic = f"{self.config.aio_username}/integration/weather/{location_id}/forecast_days_{days}"
+                client.subscribe(topic)
+                logging.info(f"Subscribed to daily forecast: {topic}")
+
         else:
             self.mqtt_connected = False
             logging.error(f"Weather MQTT connection failed (rc={rc})")
@@ -262,11 +276,26 @@ class WeatherClient:
         """MQTT weather message callback"""
         try:
             payload = msg.payload.decode('utf-8')
-            logging.debug(f"Weather MQTT received on {msg.topic}")
+            topic = msg.topic
+            logging.debug(f"Weather MQTT received on {topic}")
 
             # Parse JSON
             data = json.loads(payload)
 
+            # Route based on topic
+            if '/current' in topic:
+                self._process_current_weather(data)
+            elif '/forecast_hours_' in topic:
+                self._process_hourly_forecast(topic, data)
+            elif '/forecast_days_' in topic:
+                self._process_daily_forecast(topic, data)
+
+        except Exception as e:
+            logging.error(f"Error processing weather data: {e}")
+
+    def _process_current_weather(self, data: dict):
+        """Process current weather data"""
+        try:
             # Extract weather data directly from top level
             # Note: Adafruit IO weather integration sends data at top level, not nested in 'current'
             temp_c = data.get('temperature')
@@ -353,7 +382,66 @@ class WeatherClient:
                 self.on_weather_callback(self.weather_data)
 
         except Exception as e:
-            logging.error(f"Error processing weather data: {e}")
+            logging.error(f"Error processing current weather data: {e}")
+
+    def _process_hourly_forecast(self, topic: str, data: dict):
+        """Process hourly forecast data"""
+        try:
+            import re
+            match = re.search(r'forecast_hours_(\d+)', topic)
+            if not match:
+                return
+            hours = int(match.group(1))
+
+            temp_c = data.get('temperature')
+            if temp_c is None:
+                logging.warning(f"Hourly forecast +{hours}hr missing temperature")
+                return
+
+            self.forecast_hourly[hours] = {
+                'temp': round(temp_c * 9 / 5 + 32),
+                'condition': data.get('conditionCode', 'Clear'),
+                'time': data.get('forecastStart', ''),
+                'precip_chance': data.get('precipitationChance', 0)
+            }
+            logging.info(f"Hourly forecast updated: +{hours}hr = {self.forecast_hourly[hours]['temp']}°F, {self.forecast_hourly[hours]['condition']}")
+
+        except Exception as e:
+            logging.error(f"Error processing hourly forecast: {e}")
+
+    def _process_daily_forecast(self, topic: str, data: dict):
+        """Process daily forecast data"""
+        try:
+            import re
+            match = re.search(r'forecast_days_(\d+)', topic)
+            if not match:
+                return
+            days = int(match.group(1))
+
+            temp_max_c = data.get('temperatureMax')
+            temp_min_c = data.get('temperatureMin')
+            if temp_max_c is None or temp_min_c is None:
+                logging.warning(f"Daily forecast +{days}d missing temperatures")
+                return
+
+            self.forecast_daily[days] = {
+                'temp_max': round(temp_max_c * 9 / 5 + 32),
+                'temp_min': round(temp_min_c * 9 / 5 + 32),
+                'condition': data.get('conditionCode', 'Clear'),
+                'date': data.get('forecastStart', '')
+            }
+            logging.info(f"Daily forecast updated: +{days}d = {self.forecast_daily[days]['temp_max']}/{self.forecast_daily[days]['temp_min']}°F, {self.forecast_daily[days]['condition']}")
+
+        except Exception as e:
+            logging.error(f"Error processing daily forecast: {e}")
+
+    def get_hourly_forecasts(self) -> dict:
+        """Get hourly forecast data"""
+        return self.forecast_hourly
+
+    def get_daily_forecasts(self) -> dict:
+        """Get daily forecast data"""
+        return self.forecast_daily
 
     def get_weather_data(self) -> Optional[dict]:
         """Get latest weather data"""

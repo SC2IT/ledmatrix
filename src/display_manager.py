@@ -31,6 +31,9 @@ class DisplayManager:
         self.canvas = None
         self.current_image = None
 
+        # Forecast carousel state
+        self.carousel_view = 0  # 0 = hourly, 1 = daily
+
         # Font cache
         self.fonts = {}
         self._load_fonts()
@@ -443,6 +446,198 @@ class DisplayManager:
                 self.show_simple_message("Weather", "Error")
             except:
                 pass
+
+    def flip_carousel_view(self):
+        """Flip to next carousel view"""
+        self.carousel_view = 1 - self.carousel_view
+        logging.info(f"Carousel flipped to: {'DAILY' if self.carousel_view else 'HOURLY'}")
+
+    def show_forecast_carousel(self, current_weather: dict, hourly_forecasts: dict,
+                               daily_forecasts: dict, elapsed_seconds: float):
+        """Display forecast carousel with auto-flip and progress bar"""
+        if not self.matrix:
+            return
+
+        try:
+            self.sync_brightness_with_night_mode()
+            self.canvas.Clear()
+
+            # Render active view
+            if self.carousel_view == 0:
+                self._render_hourly_view(current_weather, hourly_forecasts)
+            else:
+                self._render_daily_view(daily_forecasts)
+
+            # Draw progress bar on row 31
+            self._render_progress_bar(elapsed_seconds)
+
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        except Exception as e:
+            logging.error(f"Error in show_forecast_carousel: {e}", exc_info=True)
+
+    def _get_temp_color_index(self, temp_f: int) -> int:
+        """Get palette color index for temperature"""
+        if temp_f <= 32:
+            return 4  # Blue
+        if temp_f >= 100:
+            return 2  # Red
+        progress = (temp_f - 32) / 68.0
+        if progress < 0.4:
+            return 7  # Cyan
+        if progress <= 0.603:
+            return 3  # Green
+        if progress < 0.8:
+            return 5  # Yellow
+        return 8  # Orange
+
+    def _abbreviate_condition(self, condition: str) -> str:
+        """Abbreviate weather condition to 2-4 chars"""
+        abbrev_map = {
+            'Clear': 'CLR',
+            'MostlyClear': 'CLR',
+            'PartlyCloudy': 'PC',
+            'MostlyCloudy': 'CLY',
+            'Cloudy': 'CLY',
+            'Rain': 'RN',
+            'Drizzle': 'DRZ',
+            'Snow': 'SNW',
+            'Sleet': 'SLT',
+            'Hail': 'HAIL',
+            'Thunderstorm': 'THND',
+            'Fog': 'FOG',
+            'Windy': 'WND'
+        }
+        return abbrev_map.get(condition, condition[:3].upper())
+
+    def _render_hourly_view(self, current_weather: dict, hourly_forecasts: dict):
+        """Render 3-panel hourly forecast: NOW | +6H | +12H"""
+        palette = self.config.get_palette()
+        font_tiny = self.fonts.get(1)
+        font_small = self.fonts.get(2)
+
+        panels = [
+            {'x': 0, 'width': 21, 'label': 'NOW', 'data': current_weather},
+            {'x': 21, 'width': 21, 'label': '+6H', 'data': hourly_forecasts.get(6)},
+            {'x': 43, 'width': 21, 'label': '+12H', 'data': hourly_forecasts.get(12)}
+        ]
+
+        for panel in panels:
+            if not panel['data']:
+                continue
+
+            x_offset = panel['x']
+            w = panel['width']
+
+            # Line 1: Time label (centered, white)
+            label_color = graphics.Color(255, 255, 255)
+            label_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, label_color, panel['label'])
+            label_x = x_offset + (w - label_w) // 2
+            graphics.DrawText(self.canvas, font_tiny, label_x,
+                             self.font_ascents.get(1, 5), label_color, panel['label'])
+
+            # Line 2: Temperature (centered, color-coded)
+            temp = panel['data'].get('temp', 0)
+            temp_str = str(temp)
+            temp_idx = self._get_temp_color_index(temp)
+            temp_rgb = palette.get(temp_idx, (255, 255, 255))
+            temp_color = graphics.Color(temp_rgb[0], temp_rgb[1], temp_rgb[2])
+
+            temp_w = graphics.DrawText(self.canvas, font_small, -1000, 0, temp_color, temp_str)
+            temp_x = x_offset + (w - temp_w) // 2
+            graphics.DrawText(self.canvas, font_small, temp_x,
+                             8 + self.font_ascents.get(2, 7), temp_color, temp_str)
+
+            # Line 3: Condition abbreviation (centered)
+            condition = panel['data'].get('condition', 'Clear')
+            abbrev = self._abbreviate_condition(condition)
+            cond_rgb = palette.get(1, (255, 255, 255))
+            cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
+
+            cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
+            cond_x = x_offset + (w - cond_w) // 2
+            graphics.DrawText(self.canvas, font_tiny, cond_x,
+                             20 + self.font_ascents.get(1, 5), cond_color, abbrev)
+
+    def _render_daily_view(self, daily_forecasts: dict):
+        """Render 3-panel daily forecast: TODAY | TMR | D+2"""
+        palette = self.config.get_palette()
+        font_tiny = self.fonts.get(1)
+        font_small = self.fonts.get(2)
+
+        day_labels = ['TODAY', 'TMR', 'DAY+2']
+        panels = [
+            {'x': 0, 'width': 21, 'label': day_labels[0], 'data': daily_forecasts.get(0)},
+            {'x': 21, 'width': 21, 'label': day_labels[1], 'data': daily_forecasts.get(1)},
+            {'x': 43, 'width': 21, 'label': day_labels[2], 'data': daily_forecasts.get(2)}
+        ]
+
+        for panel in panels:
+            if not panel['data']:
+                continue
+
+            x_offset = panel['x']
+            w = panel['width']
+
+            # Line 1: Day label (centered, white)
+            label_color = graphics.Color(255, 255, 255)
+            label_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, label_color, panel['label'])
+            label_x = x_offset + (w - label_w) // 2
+            graphics.DrawText(self.canvas, font_tiny, label_x,
+                             self.font_ascents.get(1, 5), label_color, panel['label'])
+
+            # Line 2: High temp (centered, color-coded)
+            temp_max = panel['data'].get('temp_max', 0)
+            high_str = str(temp_max)
+            high_idx = self._get_temp_color_index(temp_max)
+            high_rgb = palette.get(high_idx, (255, 255, 255))
+            high_color = graphics.Color(high_rgb[0], high_rgb[1], high_rgb[2])
+
+            high_w = graphics.DrawText(self.canvas, font_small, -1000, 0, high_color, high_str)
+            high_x = x_offset + (w - high_w) // 2
+            graphics.DrawText(self.canvas, font_small, high_x,
+                             8 + self.font_ascents.get(2, 7), high_color, high_str)
+
+            # Line 3: Low temp (centered, color-coded, smaller)
+            temp_min = panel['data'].get('temp_min', 0)
+            low_str = str(temp_min)
+            low_idx = self._get_temp_color_index(temp_min)
+            low_rgb = palette.get(low_idx, (255, 255, 255))
+            low_color = graphics.Color(low_rgb[0], low_rgb[1], low_rgb[2])
+
+            low_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, low_color, low_str)
+            low_x = x_offset + (w - low_w) // 2
+            graphics.DrawText(self.canvas, font_tiny, low_x,
+                             17 + self.font_ascents.get(1, 5), low_color, low_str)
+
+            # Line 4: Condition abbreviation
+            condition = panel['data'].get('condition', 'Clear')
+            abbrev = self._abbreviate_condition(condition)
+            cond_rgb = palette.get(1, (255, 255, 255))
+            cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
+
+            cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
+            cond_x = x_offset + (w - cond_w) // 2
+            graphics.DrawText(self.canvas, font_tiny, cond_x,
+                             24 + self.font_ascents.get(1, 5), cond_color, abbrev)
+
+    def _render_progress_bar(self, elapsed_seconds: float):
+        """Render animated progress bar on row 31"""
+        flip_interval = self.config.forecast_flip_interval
+        progress = min(1.0, elapsed_seconds / flip_interval)
+        bar_width = int(progress * self.config.display_width)
+
+        # Color gradient: cyan -> yellow -> orange
+        if progress < 0.5:
+            color = graphics.Color(0, 255, 255)  # Cyan
+        elif progress < 0.8:
+            color = graphics.Color(255, 255, 0)  # Yellow
+        else:
+            color = graphics.Color(255, 128, 0)  # Orange
+
+        # Draw filled portion of progress bar
+        for x in range(bar_width):
+            self.canvas.SetPixel(x, 31, color.red, color.green, color.blue)
 
     def _get_weather_icon_path(self, condition: str, is_night: bool) -> Optional[Path]:
         """Get path to weather icon file using Tomorrow.io naming convention"""

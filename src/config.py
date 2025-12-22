@@ -207,3 +207,8 @@ class Config:
     @property
     def logging_level(self):
         return self.data.get('logging', {}).get('level', 'INFO')
+
+    @property
+    def forecast_flip_interval(self):
+        """Forecast carousel flip interval in seconds"""
+        return self.data.get('forecast', {}).get('flip_interval', 10)
