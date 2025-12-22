@@ -13,9 +13,12 @@ Raspberry Pi Zero W 2 + Adafruit RGB Matrix HAT + RTC display controller for 32x
 
 - **Real-time Updates**: MQTT subscription to Adafruit IO for instant display updates
 - **Weather Display**: Automatic weather updates from Adafruit IO Weather service
+- **Forecast Carousel**: 3-panel hourly and daily forecasts with auto-flipping (10-second intervals)
+- **"Weather on the 8s"**: Classic Weather Channel-style interrupts every 10 minutes during forecast mode
+- **Scheduled Automation**: Auto-activate forecast at 5 AM (M-F) and 7 AM (Sat-Sun), auto-off at 11 PM
 - **Preset Layouts**: Quick access to ON-CALL, FREE, BUSY, QUIET, KNOCK displays
 - **Custom Text Formatting**: Multi-line text with customizable colors and sizes
-- **Day/Night Mode**: Automatic brightness adjustment based on time of day
+- **Day/Night Mode**: Automatic brightness adjustment based on sunrise/sunset
 - **RTC Synchronization**: Maintains accurate time even without internet
 - **Auto-start**: Systemd service runs display on boot
 
@@ -104,6 +107,10 @@ schedule:
   night_brightness: 40
   night_start: "22:00"
   night_end: "07:00"
+
+# Forecast Carousel
+forecast:
+  flip_interval: 10  # Seconds between hourly/daily view flips
 ```
 
 ## Usage
@@ -133,7 +140,8 @@ Format: `{color}<size>text`
 - `BUSY` - Busy Do Not Enter
 - `QUIET` - Quiet Meeting in Progress
 - `KNOCK` - Knock Meeting in Progress
-- `WEATHER` - Display weather information
+- `WEATHER` - Display current weather information
+- `FORECAST` - Display forecast carousel (hourly/daily auto-flip)
 - `OFF` or `BLANK` - Clear display
 
 ### Color Palette
@@ -146,6 +154,51 @@ Day mode (full brightness):
 - 15-27: Extended palette
 
 Night mode automatically dims all colors.
+
+## Forecast Carousel
+
+The `FORECAST` command displays a 3-panel carousel that alternates between hourly and daily forecasts:
+
+**Hourly View (10 seconds):**
+- **NOW**: Current temperature, condition, precipitation chance
+- **+6H**: 6-hour forecast
+- **+12H**: 12-hour forecast
+
+**Daily View (10 seconds):**
+- **TODAY**: Current temp, condition, precipitation
+- **TMR**: Tomorrow's high/low, condition, precipitation
+- **DAY+2**: Day after tomorrow's high/low, condition, precipitation
+
+**Features:**
+- Animated progress bar on bottom row (cyan → yellow → orange → red)
+- Color-coded temperatures (blue for freezing, green for comfortable, red for hot)
+- Abbreviated weather conditions (CLR, PC, RN, SNW, etc.)
+- Respects day/night mode for automatic dimming
+
+### "Weather on the 8s"
+
+During `FORECAST` mode, the display automatically interrupts every 10 minutes to show current weather:
+- Triggers at :08, :18, :28, :38, :48, :58 of each hour
+- Displays current weather with 30-second progress bar
+- Automatically resumes forecast carousel after 30 seconds
+- Mimics the classic Weather Channel "Local on the 8s" experience
+
+### Scheduled Automation
+
+The display automatically manages itself on a schedule:
+
+**Auto-FORECAST:**
+- Monday-Friday: 5:00 AM
+- Saturday-Sunday: 7:00 AM
+
+**Auto-OFF:**
+- Every day: 11:00 PM
+
+**Startup Behavior:**
+- If no command received within 60 seconds of startup, automatically activates FORECAST mode
+- Any manual command disables the startup auto-forecast
+
+**Note:** Day/night mode continues to update automatically based on sunrise/sunset times throughout all display modes.
 
 ## Service Management
 
@@ -199,12 +252,11 @@ python3 -m src.main
 
 ## Architecture
 
-- `src/main.py` - Main application entry point
-- `src/config.py` - Configuration management
-- `src/display_manager.py` - RGB matrix display control
+- `src/main.py` - Main application entry point, forecast carousel control, scheduled automation
+- `src/config.py` - Configuration management and color palettes
+- `src/display_manager.py` - RGB matrix display control, forecast rendering, progress bars
 - `src/text_renderer.py` - Text formatting and rendering
-- `src/weather.py` - Weather data and display
-- `src/aio_client.py` - Adafruit IO MQTT + REST client
+- `src/aio_client.py` - Adafruit IO MQTT + REST client, weather data parsing
 - `src/rtc_sync.py` - RTC time synchronization
 
 ## Credits

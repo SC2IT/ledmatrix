@@ -53,6 +53,12 @@ class LEDMatrixApp:
         self.startup_auto_forecast_timeout = 60  # seconds after startup
         self.startup_auto_forecast_enabled = True  # Only auto-forecast once during startup
 
+        # Schedule automation
+        self.last_schedule_check_minute = -1  # Track last minute we checked schedules
+        self.weather_on_8s_active = False  # "Weather on the 8s" mode
+        self.weather_on_8s_timer = 0.0  # Timer for 30-second display
+        self.weather_on_8s_duration = 30  # seconds
+
         # Setup signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -209,6 +215,56 @@ class LEDMatrixApp:
         # Main loop
         self._main_loop()
 
+    def _check_scheduled_automation(self):
+        """Check and execute scheduled automation tasks"""
+        from datetime import datetime
+
+        now = datetime.now()
+        current_minute = now.hour * 60 + now.minute  # Minutes since midnight
+
+        # Only check once per minute
+        if current_minute == self.last_schedule_check_minute:
+            return
+        self.last_schedule_check_minute = current_minute
+
+        # Auto-FORECAST schedule
+        # Monday-Friday at 5:00 AM
+        if now.weekday() < 5 and now.hour == 5 and now.minute == 0:
+            logging.info("Scheduled auto-FORECAST: 5 AM weekday")
+            self.forecast_mode_active = True
+            self.forecast_flip_timer = 0.0
+            return
+
+        # Saturday-Sunday at 7:00 AM
+        if now.weekday() >= 5 and now.hour == 7 and now.minute == 0:
+            logging.info("Scheduled auto-FORECAST: 7 AM weekend")
+            self.forecast_mode_active = True
+            self.forecast_flip_timer = 0.0
+            return
+
+        # Auto-OFF at 11:00 PM (23:00) daily
+        if now.hour == 23 and now.minute == 0:
+            logging.info("Scheduled auto-OFF: 11 PM")
+            self.forecast_mode_active = False
+            self.display.clear()
+            return
+
+    def _check_weather_on_8s(self):
+        """Check if it's time for 'Weather on the 8s' display"""
+        from datetime import datetime
+
+        now = datetime.now()
+        minute = now.minute
+
+        # Check if minute ends in 8 (08, 18, 28, 38, 48, 58)
+        if minute % 10 == 8 and not self.weather_on_8s_active:
+            # Only trigger once per "8" minute
+            if not hasattr(self, '_last_8s_minute') or self._last_8s_minute != minute:
+                logging.info(f"Weather on the 8s triggered at {now.strftime('%H:%M')}")
+                self.weather_on_8s_active = True
+                self.weather_on_8s_timer = 0.0
+                self._last_8s_minute = minute
+
     def _wait_for_weather_data(self):
         """Wait up to 60 seconds for weather data to load"""
         max_wait = 60  # seconds
@@ -259,6 +315,9 @@ class LEDMatrixApp:
                     if message:
                         self._on_command_received(message)
 
+                # Check scheduled automation (daily schedules)
+                self._check_scheduled_automation()
+
                 # Check for startup auto-forecast (only once, within first 60s after startup)
                 time_since_startup = current_time - self.startup_time
                 if (self.startup_auto_forecast_enabled and
@@ -271,23 +330,46 @@ class LEDMatrixApp:
 
                 # Update forecast carousel if active
                 if self.forecast_mode_active:
-                    self.forecast_flip_timer += delta_time
+                    # Check for "Weather on the 8s" trigger
+                    self._check_weather_on_8s()
 
-                    # Render carousel with current progress
-                    hourly = self.weather_client.get_hourly_forecasts() if self.weather_client else {}
-                    daily = self.weather_client.get_daily_forecasts() if self.weather_client else {}
+                    if self.weather_on_8s_active:
+                        # Show current weather with progress bar for 30 seconds
+                        self.weather_on_8s_timer += delta_time
 
-                    self.display.show_forecast_carousel(
-                        self.current_weather or {},
-                        hourly,
-                        daily,
-                        self.forecast_flip_timer
-                    )
+                        if self.current_weather:
+                            # Render weather display with "on the 8s" progress bar
+                            self.display.show_weather_with_progress(
+                                self.current_weather,
+                                self.current_weather.get('condition', 'Clear'),
+                                self.weather_on_8s_timer,
+                                self.weather_on_8s_duration
+                            )
 
-                    # Check if time to flip (after displaying full bar)
-                    if self.forecast_flip_timer >= self.config.forecast_flip_interval:
-                        self.display.flip_carousel_view()
-                        self.forecast_flip_timer = 0.0
+                        # Check if time to resume forecast
+                        if self.weather_on_8s_timer >= self.weather_on_8s_duration:
+                            logging.info("Weather on the 8s complete, resuming FORECAST")
+                            self.weather_on_8s_active = False
+                            self.weather_on_8s_timer = 0.0
+                    else:
+                        # Normal forecast carousel
+                        self.forecast_flip_timer += delta_time
+
+                        # Render carousel with current progress
+                        hourly = self.weather_client.get_hourly_forecasts() if self.weather_client else {}
+                        daily = self.weather_client.get_daily_forecasts() if self.weather_client else {}
+
+                        self.display.show_forecast_carousel(
+                            self.current_weather or {},
+                            hourly,
+                            daily,
+                            self.forecast_flip_timer
+                        )
+
+                        # Check if time to flip (after displaying full bar)
+                        if self.forecast_flip_timer >= self.config.forecast_flip_interval:
+                            self.display.flip_carousel_view()
+                            self.forecast_flip_timer = 0.0
 
                 # Update day/night mode based on time
                 if self.config.data.get('schedule', {}).get('enable_auto_dimming', True):
