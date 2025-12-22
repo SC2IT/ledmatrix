@@ -590,7 +590,7 @@ class DisplayManager:
 
             # Line 2 & 3: Temperature display (different for current vs forecast)
             if panel['type'] == 'current':
-                # TODAY: Show current temp (single value, larger)
+                # TODAY: Show current temp (match high temp position for other days)
                 temp = panel['data'].get('temp', 0)
                 temp_str = str(temp)
                 temp_idx = self._get_temp_color_index(temp)
@@ -600,7 +600,7 @@ class DisplayManager:
                 temp_w = graphics.DrawText(self.canvas, font_small, -1000, 0, temp_color, temp_str)
                 temp_x = x_offset + (w - temp_w) // 2
                 graphics.DrawText(self.canvas, font_small, temp_x,
-                                 12 + self.font_ascents.get(2, 7), temp_color, temp_str)
+                                 8 + self.font_ascents.get(2, 7), temp_color, temp_str)
             else:
                 # FORECAST: Show high/low temps
                 # Line 2: High temp
@@ -627,19 +627,38 @@ class DisplayManager:
                 graphics.DrawText(self.canvas, font_tiny, low_x,
                                  17 + self.font_ascents.get(1, 5), low_color, low_str)
 
-            # Line 4: Condition abbreviation and precipitation
+            # Line 3 & 4: Condition and precipitation (different for current vs forecast)
             condition = panel['data'].get('condition', 'Clear')
             abbrev = self._abbreviate_condition(condition)
             precip = panel['data'].get('precip_chance', 0)
-            display_str = f"{abbrev} {precip}%"
 
-            cond_rgb = palette.get(1, (255, 255, 255))
-            cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
+            if panel['type'] == 'current':
+                # TODAY: Condition on low temp line, precip below
+                cond_rgb = palette.get(1, (255, 255, 255))
+                cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
 
-            cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, display_str)
-            cond_x = x_offset + (w - cond_w) // 2
-            graphics.DrawText(self.canvas, font_tiny, cond_x,
-                             24 + self.font_ascents.get(1, 5), cond_color, display_str)
+                # Line 3: Condition (match low temp position)
+                cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
+                cond_x = x_offset + (w - cond_w) // 2
+                graphics.DrawText(self.canvas, font_tiny, cond_x,
+                                 17 + self.font_ascents.get(1, 5), cond_color, abbrev)
+
+                # Line 4: Precipitation percentage
+                precip_str = f"{precip}%"
+                precip_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, precip_str)
+                precip_x = x_offset + (w - precip_w) // 2
+                graphics.DrawText(self.canvas, font_tiny, precip_x,
+                                 24 + self.font_ascents.get(1, 5), cond_color, precip_str)
+            else:
+                # FORECAST: Condition + precip on one line
+                display_str = f"{abbrev} {precip}%"
+                cond_rgb = palette.get(1, (255, 255, 255))
+                cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
+
+                cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, display_str)
+                cond_x = x_offset + (w - cond_w) // 2
+                graphics.DrawText(self.canvas, font_tiny, cond_x,
+                                 24 + self.font_ascents.get(1, 5), cond_color, display_str)
 
     def _render_progress_bar(self, elapsed_seconds: float):
         """Render animated progress bar on row 31"""
