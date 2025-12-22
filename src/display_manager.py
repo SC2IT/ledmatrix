@@ -650,15 +650,26 @@ class DisplayManager:
                 graphics.DrawText(self.canvas, font_tiny, precip_x,
                                  24 + self.font_ascents.get(1, 5), cond_color, precip_str)
             else:
-                # FORECAST: Condition + precip on one line
-                display_str = f"{abbrev} {precip}%"
+                # FORECAST: Condition + precip closer together (2px spacing instead of space char)
+                precip_str = f"{precip}%"
                 cond_rgb = palette.get(1, (255, 255, 255))
                 cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
 
-                cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, display_str)
-                cond_x = x_offset + (w - cond_w) // 2
-                graphics.DrawText(self.canvas, font_tiny, cond_x,
-                                 24 + self.font_ascents.get(1, 5), cond_color, display_str)
+                # Calculate total width with 2px spacing
+                abbrev_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
+                precip_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, precip_str)
+                total_w = abbrev_w + 2 + precip_w  # 2px spacing
+
+                # Center the combined text
+                start_x = x_offset + (w - total_w) // 2
+
+                # Draw condition
+                graphics.DrawText(self.canvas, font_tiny, start_x,
+                                 24 + self.font_ascents.get(1, 5), cond_color, abbrev)
+
+                # Draw precip 2px after condition
+                graphics.DrawText(self.canvas, font_tiny, start_x + abbrev_w + 2,
+                                 24 + self.font_ascents.get(1, 5), cond_color, precip_str)
 
     def _render_progress_bar(self, elapsed_seconds: float):
         """Render animated progress bar on row 31"""
