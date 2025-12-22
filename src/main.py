@@ -259,12 +259,7 @@ class LEDMatrixApp:
                 if self.forecast_mode_active:
                     self.forecast_flip_timer += delta_time
 
-                    # Check if time to flip
-                    if self.forecast_flip_timer >= self.config.forecast_flip_interval:
-                        self.display.flip_carousel_view()
-                        self.forecast_flip_timer = 0.0
-
-                    # Render carousel
+                    # Render carousel with current progress
                     hourly = self.weather_client.get_hourly_forecasts() if self.weather_client else {}
                     daily = self.weather_client.get_daily_forecasts() if self.weather_client else {}
 
@@ -274,6 +269,11 @@ class LEDMatrixApp:
                         daily,
                         self.forecast_flip_timer
                     )
+
+                    # Check if time to flip (after displaying full bar)
+                    if self.forecast_flip_timer >= self.config.forecast_flip_interval:
+                        self.display.flip_carousel_view()
+                        self.forecast_flip_timer = 0.0
 
                 # Update day/night mode based on time
                 if self.config.data.get('schedule', {}).get('enable_auto_dimming', True):

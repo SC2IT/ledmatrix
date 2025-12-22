@@ -676,7 +676,9 @@ class DisplayManager:
         palette = self.config.get_palette()
         flip_interval = self.config.forecast_flip_interval
         progress = min(1.0, elapsed_seconds / flip_interval)
-        bar_width = int(progress * self.config.display_width)
+
+        # Start with at least 1 pixel, fill to full width before switching
+        bar_width = max(1, int(progress * self.config.display_width))
 
         # Color gradient from palette: cyan -> yellow -> orange
         if progress < 0.5:
