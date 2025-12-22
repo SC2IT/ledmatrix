@@ -404,7 +404,7 @@ class WeatherClient:
                 'temp': round(temp_c * 9 / 5 + 32),
                 'condition': data.get('conditionCode', 'Clear'),
                 'time': data.get('forecastStart', ''),
-                'precip_chance': data.get('precipitationChance', 0)
+                'precip_chance': round(data.get('precipitationChance', 0) * 100)
             }
             logging.info(f"Hourly forecast updated: +{hours}hr = {self.forecast_hourly[hours]['temp']}°F, {self.forecast_hourly[hours]['condition']}")
 
