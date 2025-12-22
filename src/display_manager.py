@@ -680,13 +680,15 @@ class DisplayManager:
         # Start with at least 1 pixel, fill to full width before switching
         bar_width = max(1, int(progress * self.config.display_width))
 
-        # Color gradient from palette: cyan -> yellow -> orange
+        # Color gradient from palette: cyan -> yellow -> orange -> red
         if progress < 0.5:
             color_rgb = palette.get(7, (0, 255, 255))  # Cyan
         elif progress < 0.8:
             color_rgb = palette.get(5, (255, 255, 0))  # Yellow
-        else:
+        elif progress < 0.95:
             color_rgb = palette.get(8, (255, 128, 0))  # Orange
+        else:
+            color_rgb = palette.get(2, (255, 0, 0))  # Red (warning: about to flip)
 
         color = graphics.Color(color_rgb[0], color_rgb[1], color_rgb[2])
 
