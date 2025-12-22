@@ -537,7 +537,7 @@ class DisplayManager:
             graphics.DrawText(self.canvas, font_tiny, label_x,
                              self.font_ascents.get(1, 5), label_color, panel['label'])
 
-            # Line 2: Temperature (centered, color-coded)
+            # Line 2: Temperature (centered, color-coded) - matches daily view
             temp = panel['data'].get('temp', 0)
             temp_str = str(temp)
             temp_idx = self._get_temp_color_index(temp)
@@ -549,7 +549,7 @@ class DisplayManager:
             graphics.DrawText(self.canvas, font_small, temp_x,
                              8 + self.font_ascents.get(2, 7), temp_color, temp_str)
 
-            # Line 3: Condition abbreviation (centered)
+            # Line 3: Condition abbreviation (centered) - matches daily view position
             condition = panel['data'].get('condition', 'Clear')
             abbrev = self._abbreviate_condition(condition)
             cond_rgb = palette.get(1, (255, 255, 255))
@@ -558,7 +558,15 @@ class DisplayManager:
             cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
             cond_x = x_offset + (w - cond_w) // 2
             graphics.DrawText(self.canvas, font_tiny, cond_x,
-                             20 + self.font_ascents.get(1, 5), cond_color, abbrev)
+                             17 + self.font_ascents.get(1, 5), cond_color, abbrev)
+
+            # Line 4: Precipitation percentage (centered) - matches daily view
+            precip = panel['data'].get('precip_chance', 0)
+            precip_str = f"{precip}%"
+            precip_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, precip_str)
+            precip_x = x_offset + (w - precip_w) // 2
+            graphics.DrawText(self.canvas, font_tiny, precip_x,
+                             24 + self.font_ascents.get(1, 5), cond_color, precip_str)
 
     def _render_daily_view(self, daily_forecasts: dict, current_weather: dict = None):
         """Render 3-panel daily forecast: TODAY | TMR | D+2"""
@@ -677,8 +685,8 @@ class DisplayManager:
         flip_interval = self.config.forecast_flip_interval
         progress = min(1.0, elapsed_seconds / flip_interval)
 
-        # Start with at least 1 pixel, fill to full width before switching
-        bar_width = max(1, int(progress * self.config.display_width))
+        # Calculate bar width (will reach full 64 pixels at 100%)
+        bar_width = int(progress * self.config.display_width)
 
         # Color gradient from palette: cyan -> yellow -> orange -> red
         if progress < 0.5:
