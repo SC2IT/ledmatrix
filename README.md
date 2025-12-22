@@ -86,32 +86,82 @@ sudo systemctl start ledmatrix
 Edit `config.yaml` with your settings:
 
 ```yaml
-# Adafruit IO Credentials
+# Adafruit IO Configuration
 aio:
   username: "your_aio_username"
   key: "your_aio_key"
   feed: "matrixmessage"
-  weather_location_id: 2815  # Your weather location ID
+  weather_location_id: 2815  # Your Adafruit IO weather location ID
 
-# Display Settings
+  # MQTT settings (real-time updates)
+  mqtt:
+    enabled: true
+    broker: "io.adafruit.com"
+    port: 1883
+    keepalive: 60
+
+  # REST API fallback (used when MQTT disconnected)
+  rest:
+    enabled: true
+    poll_interval: 10  # seconds
+
+# LED Matrix Hardware Configuration
 display:
   width: 64
   height: 32
-  brightness: 100  # 1-100
-  gpio_slowdown: 4  # Increase if flickering (4 recommended with sound enabled)
+  brightness: 100   # 1-100: Global brightness
+  gpio_slowdown: 4  # 0-4: Increase if flickering
+  pwm_bits: 11      # 1-11: Color depth (11 = best quality)
+  hardware_pulse: true  # true = better display (disables sound)
 
-# Day/Night Mode
-schedule:
-  enable_auto_dimming: true
-  day_brightness: 100
-  night_brightness: 40
-  night_start: "22:00"
-  night_end: "07:00"
+  # Advanced options (usually don't need to change)
+  hardware_mapping: "adafruit-hat-pwm"
+  rows: 32
+  chain_length: 1
+  parallel: 1
+  multiplexing: 0
 
-# Forecast Carousel
+# Forecast Carousel Configuration
 forecast:
   flip_interval: 10  # Seconds between hourly/daily view flips
+
+# Day/Night Mode Schedule (fallback when weather unavailable)
+schedule:
+  enable_auto_dimming: true
+  night_start: "22:00"  # 24-hour format
+  night_end: "07:00"
+
+# RTC Configuration
+rtc:
+  enabled: true
+  i2c_bus: 1
+  address: 0x68
+  sync_interval: 3600  # Sync system time from RTC every hour
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "/var/log/ledmatrix.log"
+  max_size_mb: 10
+  backup_count: 3
 ```
+
+### Day/Night Mode Explained
+
+The display automatically adjusts colors for day and night viewing:
+
+**Primary Mode (Weather-based):**
+- Uses sunrise/sunset times from weather data location
+- Automatically switches based on actual daylight hours
+- Night palette: All colors dimmed to 25% brightness
+- Day palette: Full vibrant colors
+
+**Fallback Mode (Schedule-based):**
+- Only used when weather data unavailable
+- Uses `night_start` and `night_end` times from config
+- Requires `enable_auto_dimming: true`
+
+**Note:** Brightness adjustment is done via color palette, not hardware brightness setting. The `brightness` setting remains constant.
 
 ## Usage
 
@@ -148,12 +198,12 @@ Format: `{color}<size>text`
 
 Day mode (full brightness):
 - 0: Black, 1: White, 2: Red, 3: Green, 4: Blue
-- 5: Yellow, 6: Magenta, 7: Cyan, 8: Orange
+- 5: Yellow/Orange, 6: Magenta, 7: Cyan, 8: Orange Red
 - 9: Purple, 10: Hot Pink, 11: Lime Green
-- 12: Deep Pink, 13: Sky Blue, 14: Gold
-- 15-27: Extended palette
+- 12: Deep Pink, 13: Deep Sky Blue, 14: Gold
+- 15-27: Extended palette (orange red, medium purple, medium spring green, tomato, turquoise, orchid, pale green, khaki, plum, sky blue, wheat, light salmon, light sea green)
 
-Night mode automatically dims all colors.
+Night mode automatically dims all colors to 25% brightness (palette-based dimming).
 
 ## Forecast Carousel
 

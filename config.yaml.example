@@ -37,6 +37,10 @@ display:
   parallel: 1
   multiplexing: 0
 
+# Forecast Carousel Configuration
+forecast:
+  flip_interval: 10  # Seconds between view flips (hourly <-> daily)
+
 # Day/Night Mode
 schedule:
   enable_auto_dimming: true
