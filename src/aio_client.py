@@ -366,7 +366,8 @@ class WeatherClient:
                 'pressure': pressure_inhg,
                 'pressure_trend': pressure_trend,
                 'is_night': is_night,
-                'condition': condition
+                'condition': condition,
+                'precip_chance': round(data.get('precipitationChance', 0) * 100)
             }
 
             # Update day/night mode based on sunrise/sunset

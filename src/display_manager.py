@@ -628,13 +628,8 @@ class DisplayManager:
             # Line 4: Condition abbreviation and precipitation
             condition = panel['data'].get('condition', 'Clear')
             abbrev = self._abbreviate_condition(condition)
-
-            # Add precipitation chance for forecast days
-            if panel['type'] == 'forecast':
-                precip = panel['data'].get('precip_chance', 0)
-                display_str = f"{abbrev} {precip}%"
-            else:
-                display_str = abbrev
+            precip = panel['data'].get('precip_chance', 0)
+            display_str = f"{abbrev} {precip}%"
 
             cond_rgb = palette.get(1, (255, 255, 255))
             cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
