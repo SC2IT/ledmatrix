@@ -377,11 +377,24 @@ class DisplayManager:
             baseline_y2 = 10 + self.font_ascents.get(2, 7)
             graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y2, feels_graphics_color, f"FL{feels}F")
 
-            # Line 3: Wind (y=17) - color 8 (orange)
+            # Line 3: Wind (y=17) - color 8 (orange) with 2px spacing between components
             wind_color = palette.get(8, (255, 165, 0))  # Orange
             wind_graphics_color = graphics.Color(wind_color[0], wind_color[1], wind_color[2])
             baseline_y3 = 17 + self.font_ascents.get(2, 7)
-            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y3, wind_graphics_color, f"{wind_dir}{wind_speed:02d}MPH")
+
+            # Draw wind components separately with 2px spacing
+            current_x = 1
+            # Draw direction
+            dir_width = graphics.DrawText(self.canvas, self.fonts.get(2, font_small), current_x, baseline_y3, wind_graphics_color, wind_dir)
+            current_x += dir_width + 2  # 2px spacing
+
+            # Draw speed
+            speed_str = f"{wind_speed:02d}"
+            speed_width = graphics.DrawText(self.canvas, self.fonts.get(2, font_small), current_x, baseline_y3, wind_graphics_color, speed_str)
+            current_x += speed_width + 2  # 2px spacing
+
+            # Draw MPH
+            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), current_x, baseline_y3, wind_graphics_color, "MPH")
 
             # Line 4: Humidity (y=24) - color 9 (pink/magenta)
             humidity_color = palette.get(9, (255, 0, 255))  # Pink/Magenta
@@ -534,11 +547,24 @@ class DisplayManager:
             baseline_y2 = 10 + self.font_ascents.get(2, 7)
             graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y2, feels_graphics_color, f"FL{feels}F")
 
-            # Line 3: Wind (y=17)
+            # Line 3: Wind (y=17) - with 2px spacing between components
             wind_color = palette.get(8, (255, 165, 0))  # Orange
             wind_graphics_color = graphics.Color(wind_color[0], wind_color[1], wind_color[2])
             baseline_y3 = 17 + self.font_ascents.get(2, 7)
-            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y3, wind_graphics_color, f"{wind_dir}{wind_speed:02d}MPH")
+
+            # Draw wind components separately with 2px spacing
+            current_x = 1
+            # Draw direction
+            dir_width = graphics.DrawText(self.canvas, self.fonts.get(2, font_small), current_x, baseline_y3, wind_graphics_color, wind_dir)
+            current_x += dir_width + 2  # 2px spacing
+
+            # Draw speed
+            speed_str = f"{wind_speed:02d}"
+            speed_width = graphics.DrawText(self.canvas, self.fonts.get(2, font_small), current_x, baseline_y3, wind_graphics_color, speed_str)
+            current_x += speed_width + 2  # 2px spacing
+
+            # Draw MPH
+            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), current_x, baseline_y3, wind_graphics_color, "MPH")
 
             # Line 4: Humidity (y=24)
             humidity_color = palette.get(9, (255, 0, 255))  # Pink/Magenta
