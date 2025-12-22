@@ -204,7 +204,7 @@ class WeatherClient:
         self.mqtt_connected = False
         self.weather_data = None
         self.forecast_hourly = {}  # Key: hours ahead (6, 12)
-        self.forecast_daily = {}   # Key: days ahead (0, 1, 2)
+        self.forecast_daily = {}   # Key: days ahead (1, 2) - no forecast_days_0
 
         # Initialize MQTT
         self._init_mqtt()
@@ -256,8 +256,9 @@ class WeatherClient:
                 client.subscribe(topic)
                 logging.info(f"Subscribed to hourly forecast: {topic}")
 
-            # Subscribe to daily forecasts (today, tomorrow, day+2)
-            for days in [0, 1, 2]:
+            # Subscribe to daily forecasts (tomorrow, day+2)
+            # Note: forecast_days_0 doesn't exist, use current weather for today
+            for days in [1, 2]:
                 topic = f"{self.config.aio_username}/integration/weather/{location_id}/forecast_days_{days}"
                 client.subscribe(topic)
                 logging.info(f"Subscribed to daily forecast: {topic}")
@@ -428,7 +429,8 @@ class WeatherClient:
                 'temp_max': round(temp_max_c * 9 / 5 + 32),
                 'temp_min': round(temp_min_c * 9 / 5 + 32),
                 'condition': data.get('conditionCode', 'Clear'),
-                'date': data.get('forecastStart', '')
+                'date': data.get('forecastStart', ''),
+                'precip_chance': round(data.get('precipitationChance', 0) * 100)
             }
             logging.info(f"Daily forecast updated: +{days}d = {self.forecast_daily[days]['temp_max']}/{self.forecast_daily[days]['temp_min']}°F, {self.forecast_daily[days]['condition']}")
 

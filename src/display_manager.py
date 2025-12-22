@@ -466,7 +466,7 @@ class DisplayManager:
             if self.carousel_view == 0:
                 self._render_hourly_view(current_weather, hourly_forecasts)
             else:
-                self._render_daily_view(daily_forecasts)
+                self._render_daily_view(daily_forecasts, current_weather)
 
             # Draw progress bar on row 31
             self._render_progress_bar(elapsed_seconds)
@@ -559,7 +559,7 @@ class DisplayManager:
             graphics.DrawText(self.canvas, font_tiny, cond_x,
                              20 + self.font_ascents.get(1, 5), cond_color, abbrev)
 
-    def _render_daily_view(self, daily_forecasts: dict):
+    def _render_daily_view(self, daily_forecasts: dict, current_weather: dict = None):
         """Render 3-panel daily forecast: TODAY | TMR | D+2"""
         palette = self.config.get_palette()
         font_tiny = self.fonts.get(1)
@@ -567,9 +567,9 @@ class DisplayManager:
 
         day_labels = ['TODAY', 'TMR', 'DAY+2']
         panels = [
-            {'x': 0, 'width': 21, 'label': day_labels[0], 'data': daily_forecasts.get(0)},
-            {'x': 21, 'width': 21, 'label': day_labels[1], 'data': daily_forecasts.get(1)},
-            {'x': 43, 'width': 21, 'label': day_labels[2], 'data': daily_forecasts.get(2)}
+            {'x': 0, 'width': 21, 'label': day_labels[0], 'data': current_weather, 'type': 'current'},
+            {'x': 21, 'width': 21, 'label': day_labels[1], 'data': daily_forecasts.get(1), 'type': 'forecast'},
+            {'x': 43, 'width': 21, 'label': day_labels[2], 'data': daily_forecasts.get(2), 'type': 'forecast'}
         ]
 
         for panel in panels:
@@ -586,54 +586,80 @@ class DisplayManager:
             graphics.DrawText(self.canvas, font_tiny, label_x,
                              self.font_ascents.get(1, 5), label_color, panel['label'])
 
-            # Line 2: High temp (centered, color-coded)
-            temp_max = panel['data'].get('temp_max', 0)
-            high_str = str(temp_max)
-            high_idx = self._get_temp_color_index(temp_max)
-            high_rgb = palette.get(high_idx, (255, 255, 255))
-            high_color = graphics.Color(high_rgb[0], high_rgb[1], high_rgb[2])
+            # Line 2 & 3: Temperature display (different for current vs forecast)
+            if panel['type'] == 'current':
+                # TODAY: Show current temp (single value, larger)
+                temp = panel['data'].get('temp', 0)
+                temp_str = str(temp)
+                temp_idx = self._get_temp_color_index(temp)
+                temp_rgb = palette.get(temp_idx, (255, 255, 255))
+                temp_color = graphics.Color(temp_rgb[0], temp_rgb[1], temp_rgb[2])
 
-            high_w = graphics.DrawText(self.canvas, font_small, -1000, 0, high_color, high_str)
-            high_x = x_offset + (w - high_w) // 2
-            graphics.DrawText(self.canvas, font_small, high_x,
-                             8 + self.font_ascents.get(2, 7), high_color, high_str)
+                temp_w = graphics.DrawText(self.canvas, font_small, -1000, 0, temp_color, temp_str)
+                temp_x = x_offset + (w - temp_w) // 2
+                graphics.DrawText(self.canvas, font_small, temp_x,
+                                 12 + self.font_ascents.get(2, 7), temp_color, temp_str)
+            else:
+                # FORECAST: Show high/low temps
+                # Line 2: High temp
+                temp_max = panel['data'].get('temp_max', 0)
+                high_str = str(temp_max)
+                high_idx = self._get_temp_color_index(temp_max)
+                high_rgb = palette.get(high_idx, (255, 255, 255))
+                high_color = graphics.Color(high_rgb[0], high_rgb[1], high_rgb[2])
 
-            # Line 3: Low temp (centered, color-coded, smaller)
-            temp_min = panel['data'].get('temp_min', 0)
-            low_str = str(temp_min)
-            low_idx = self._get_temp_color_index(temp_min)
-            low_rgb = palette.get(low_idx, (255, 255, 255))
-            low_color = graphics.Color(low_rgb[0], low_rgb[1], low_rgb[2])
+                high_w = graphics.DrawText(self.canvas, font_small, -1000, 0, high_color, high_str)
+                high_x = x_offset + (w - high_w) // 2
+                graphics.DrawText(self.canvas, font_small, high_x,
+                                 8 + self.font_ascents.get(2, 7), high_color, high_str)
 
-            low_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, low_color, low_str)
-            low_x = x_offset + (w - low_w) // 2
-            graphics.DrawText(self.canvas, font_tiny, low_x,
-                             17 + self.font_ascents.get(1, 5), low_color, low_str)
+                # Line 3: Low temp
+                temp_min = panel['data'].get('temp_min', 0)
+                low_str = str(temp_min)
+                low_idx = self._get_temp_color_index(temp_min)
+                low_rgb = palette.get(low_idx, (255, 255, 255))
+                low_color = graphics.Color(low_rgb[0], low_rgb[1], low_rgb[2])
 
-            # Line 4: Condition abbreviation
+                low_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, low_color, low_str)
+                low_x = x_offset + (w - low_w) // 2
+                graphics.DrawText(self.canvas, font_tiny, low_x,
+                                 17 + self.font_ascents.get(1, 5), low_color, low_str)
+
+            # Line 4: Condition abbreviation and precipitation
             condition = panel['data'].get('condition', 'Clear')
             abbrev = self._abbreviate_condition(condition)
+
+            # Add precipitation chance for forecast days
+            if panel['type'] == 'forecast':
+                precip = panel['data'].get('precip_chance', 0)
+                display_str = f"{abbrev} {precip}%"
+            else:
+                display_str = abbrev
+
             cond_rgb = palette.get(1, (255, 255, 255))
             cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
 
-            cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
+            cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, display_str)
             cond_x = x_offset + (w - cond_w) // 2
             graphics.DrawText(self.canvas, font_tiny, cond_x,
-                             24 + self.font_ascents.get(1, 5), cond_color, abbrev)
+                             24 + self.font_ascents.get(1, 5), cond_color, display_str)
 
     def _render_progress_bar(self, elapsed_seconds: float):
         """Render animated progress bar on row 31"""
+        palette = self.config.get_palette()
         flip_interval = self.config.forecast_flip_interval
         progress = min(1.0, elapsed_seconds / flip_interval)
         bar_width = int(progress * self.config.display_width)
 
-        # Color gradient: cyan -> yellow -> orange
+        # Color gradient from palette: cyan -> yellow -> orange
         if progress < 0.5:
-            color = graphics.Color(0, 255, 255)  # Cyan
+            color_rgb = palette.get(7, (0, 255, 255))  # Cyan
         elif progress < 0.8:
-            color = graphics.Color(255, 255, 0)  # Yellow
+            color_rgb = palette.get(5, (255, 255, 0))  # Yellow
         else:
-            color = graphics.Color(255, 128, 0)  # Orange
+            color_rgb = palette.get(8, (255, 128, 0))  # Orange
+
+        color = graphics.Color(color_rgb[0], color_rgb[1], color_rgb[2])
 
         # Draw filled portion of progress bar
         for x in range(bar_width):
