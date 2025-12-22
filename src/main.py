@@ -191,11 +191,11 @@ class LEDMatrixApp:
         # Initialize Weather client
         self.weather_client = WeatherClient(self.config, on_weather_callback=self._on_weather_update)
 
-        # Show startup message
-        self.display.show_simple_message("Connected", "Ready")
-        time.sleep(2)
-
+        # Wait for weather data to load (up to 60 seconds)
         self.running = True
+        logging.info("Waiting for weather data...")
+        self._wait_for_weather_data()
+
         logging.info("Application started successfully")
 
         # Log status
@@ -204,6 +204,40 @@ class LEDMatrixApp:
 
         # Main loop
         self._main_loop()
+
+    def _wait_for_weather_data(self):
+        """Wait up to 60 seconds for weather data to load"""
+        max_wait = 60  # seconds
+        check_interval = 1  # seconds
+        elapsed = 0
+
+        while elapsed < max_wait and self.running:
+            # Check if we have weather data
+            has_current = self.current_weather is not None
+            has_hourly = len(self.weather_client.get_hourly_forecasts()) > 0 if self.weather_client else False
+            has_daily = len(self.weather_client.get_daily_forecasts()) > 0 if self.weather_client else False
+
+            if has_current and has_hourly and has_daily:
+                logging.info(f"Weather data loaded after {elapsed} seconds")
+                self.display.show_simple_message("Weather", "Loaded!")
+                time.sleep(1)
+                return
+
+            # Update loading display
+            dots = "." * ((elapsed % 4))
+            remaining = max_wait - elapsed
+            self.display.show_simple_message("Loading", f"Weather{dots} {remaining}s")
+
+            time.sleep(check_interval)
+            elapsed += check_interval
+
+        # Timeout or interrupted
+        if elapsed >= max_wait:
+            logging.warning("Weather data loading timeout after 60 seconds")
+            self.display.show_simple_message("Timeout", "Starting...")
+            time.sleep(2)
+        else:
+            logging.info("Weather data wait interrupted")
 
     def _main_loop(self):
         """Main application loop"""
