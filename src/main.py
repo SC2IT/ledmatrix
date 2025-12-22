@@ -49,6 +49,8 @@ class LEDMatrixApp:
         self.forecast_mode_active = False
         self.forecast_flip_timer = 0.0
         self.last_loop_time = time.time()
+        self.last_command_time = time.time()
+        self.auto_forecast_timeout = 60  # seconds of inactivity before auto-forecast
 
         # Setup signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -114,6 +116,7 @@ class LEDMatrixApp:
             return
 
         self.last_command = command
+        self.last_command_time = time.time()  # Reset inactivity timer
         logging.info(f"Command received ({source}): {command}")
 
         # Process command
@@ -254,6 +257,13 @@ class LEDMatrixApp:
                     message = self.aio_client.poll_rest_api()
                     if message:
                         self._on_command_received(message)
+
+                # Check for inactivity and auto-enable forecast mode
+                time_since_last_command = current_time - self.last_command_time
+                if not self.forecast_mode_active and time_since_last_command >= self.auto_forecast_timeout:
+                    logging.info(f"Auto-activating FORECAST mode after {self.auto_forecast_timeout}s inactivity")
+                    self.forecast_mode_active = True
+                    self.forecast_flip_timer = 0.0
 
                 # Update forecast carousel if active
                 if self.forecast_mode_active:
