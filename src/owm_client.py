@@ -340,7 +340,7 @@ class OWMClient:
                     'precip_chance': round(precip_prob)
                 }
 
-            # Extract daily forecasts (next 2 days)
+            # Extract daily forecasts (today + next 2 days)
             # Group by day and calculate high/low
             from collections import defaultdict
             daily_temps = defaultdict(lambda: {'temps': [], 'conditions': [], 'precip': []})
@@ -349,7 +349,7 @@ class OWMClient:
                 dt = datetime.fromtimestamp(item['dt'])
                 day_offset = (dt.date() - datetime.now().date()).days
 
-                if 1 <= day_offset <= 2:  # Tomorrow and day after
+                if 0 <= day_offset <= 2:  # Today, tomorrow, and day after
                     daily_temps[day_offset]['temps'].append(item['main']['temp'])
                     # Store mapped condition
                     owm_cond = item['weather'][0]['main']

@@ -775,7 +775,7 @@ class DisplayManager:
 
         day_labels = ['TODAY', 'TMR', 'DAY+2']
         panels = [
-            {'x': 0, 'width': 21, 'label': day_labels[0], 'data': current_weather, 'type': 'current'},
+            {'x': 0, 'width': 21, 'label': day_labels[0], 'data': daily_forecasts.get(0), 'type': 'forecast'},
             {'x': 21, 'width': 21, 'label': day_labels[1], 'data': daily_forecasts.get(1), 'type': 'forecast'},
             {'x': 43, 'width': 21, 'label': day_labels[2], 'data': daily_forecasts.get(2), 'type': 'forecast'}
         ]
@@ -795,88 +795,54 @@ class DisplayManager:
             graphics.DrawText(self.canvas, font_tiny, label_x,
                              self.font_ascents.get(1, 5), label_color, panel['label'])
 
-            # Line 2 & 3: Temperature display (different for current vs forecast)
-            if panel['type'] == 'current':
-                # TODAY: Show current temp (match high temp position for other days)
-                temp = panel['data'].get('temp', 0)
-                temp_str = str(temp)
-                temp_idx = self._get_temp_color_index(temp)
-                temp_rgb = palette.get(temp_idx, (255, 255, 255))
-                temp_color = graphics.Color(temp_rgb[0], temp_rgb[1], temp_rgb[2])
+            # Line 2: High temp
+            temp_max = panel['data'].get('temp_max', 0)
+            high_str = str(temp_max)
+            high_idx = self._get_temp_color_index(temp_max)
+            high_rgb = palette.get(high_idx, (255, 255, 255))
+            high_color = graphics.Color(high_rgb[0], high_rgb[1], high_rgb[2])
 
-                temp_w = graphics.DrawText(self.canvas, font_small, -1000, 0, temp_color, temp_str)
-                temp_x = x_offset + (w - temp_w) // 2
-                graphics.DrawText(self.canvas, font_small, temp_x,
-                                 8 + self.font_ascents.get(2, 7), temp_color, temp_str)
-            else:
-                # FORECAST: Show high/low temps
-                # Line 2: High temp
-                temp_max = panel['data'].get('temp_max', 0)
-                high_str = str(temp_max)
-                high_idx = self._get_temp_color_index(temp_max)
-                high_rgb = palette.get(high_idx, (255, 255, 255))
-                high_color = graphics.Color(high_rgb[0], high_rgb[1], high_rgb[2])
+            high_w = graphics.DrawText(self.canvas, font_small, -1000, 0, high_color, high_str)
+            high_x = x_offset + (w - high_w) // 2
+            graphics.DrawText(self.canvas, font_small, high_x,
+                             8 + self.font_ascents.get(2, 7), high_color, high_str)
 
-                high_w = graphics.DrawText(self.canvas, font_small, -1000, 0, high_color, high_str)
-                high_x = x_offset + (w - high_w) // 2
-                graphics.DrawText(self.canvas, font_small, high_x,
-                                 8 + self.font_ascents.get(2, 7), high_color, high_str)
+            # Line 3: Low temp
+            temp_min = panel['data'].get('temp_min', 0)
+            low_str = str(temp_min)
+            low_idx = self._get_temp_color_index(temp_min)
+            low_rgb = palette.get(low_idx, (255, 255, 255))
+            low_color = graphics.Color(low_rgb[0], low_rgb[1], low_rgb[2])
 
-                # Line 3: Low temp
-                temp_min = panel['data'].get('temp_min', 0)
-                low_str = str(temp_min)
-                low_idx = self._get_temp_color_index(temp_min)
-                low_rgb = palette.get(low_idx, (255, 255, 255))
-                low_color = graphics.Color(low_rgb[0], low_rgb[1], low_rgb[2])
+            low_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, low_color, low_str)
+            low_x = x_offset + (w - low_w) // 2
+            graphics.DrawText(self.canvas, font_tiny, low_x,
+                             17 + self.font_ascents.get(1, 5), low_color, low_str)
 
-                low_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, low_color, low_str)
-                low_x = x_offset + (w - low_w) // 2
-                graphics.DrawText(self.canvas, font_tiny, low_x,
-                                 17 + self.font_ascents.get(1, 5), low_color, low_str)
-
-            # Line 3 & 4: Condition and precipitation (different for current vs forecast)
+            # Line 4: Condition + precipitation (2px spacing)
             condition = panel['data'].get('condition', 'Clear')
             abbrev = self._abbreviate_condition(condition)
             precip = panel['data'].get('precip_chance', 0)
+            precip_str = f"{precip}%"
 
-            if panel['type'] == 'current':
-                # TODAY: Condition on low temp line, precip below
-                cond_rgb = palette.get(1, (255, 255, 255))
-                cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
+            cond_rgb = palette.get(1, (255, 255, 255))
+            cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
 
-                # Line 3: Condition (match low temp position)
-                cond_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
-                cond_x = x_offset + (w - cond_w) // 2
-                graphics.DrawText(self.canvas, font_tiny, cond_x,
-                                 17 + self.font_ascents.get(1, 5), cond_color, abbrev)
+            # Calculate total width with 2px spacing
+            abbrev_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
+            precip_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, precip_str)
+            total_w = abbrev_w + 2 + precip_w  # 2px spacing
 
-                # Line 4: Precipitation percentage
-                precip_str = f"{precip}%"
-                precip_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, precip_str)
-                precip_x = x_offset + (w - precip_w) // 2
-                graphics.DrawText(self.canvas, font_tiny, precip_x,
-                                 24 + self.font_ascents.get(1, 5), cond_color, precip_str)
-            else:
-                # FORECAST: Condition + precip closer together (2px spacing instead of space char)
-                precip_str = f"{precip}%"
-                cond_rgb = palette.get(1, (255, 255, 255))
-                cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
+            # Center the combined text
+            start_x = x_offset + (w - total_w) // 2
 
-                # Calculate total width with 2px spacing
-                abbrev_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
-                precip_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, precip_str)
-                total_w = abbrev_w + 2 + precip_w  # 2px spacing
+            # Draw condition
+            graphics.DrawText(self.canvas, font_tiny, start_x,
+                             24 + self.font_ascents.get(1, 5), cond_color, abbrev)
 
-                # Center the combined text
-                start_x = x_offset + (w - total_w) // 2
-
-                # Draw condition
-                graphics.DrawText(self.canvas, font_tiny, start_x,
-                                 24 + self.font_ascents.get(1, 5), cond_color, abbrev)
-
-                # Draw precip 2px after condition
-                graphics.DrawText(self.canvas, font_tiny, start_x + abbrev_w + 2,
-                                 24 + self.font_ascents.get(1, 5), cond_color, precip_str)
+            # Draw precip 2px after condition
+            graphics.DrawText(self.canvas, font_tiny, start_x + abbrev_w + 2,
+                             24 + self.font_ascents.get(1, 5), cond_color, precip_str)
 
     def _render_progress_bar(self, elapsed_seconds: float):
         """Render animated progress bar on row 31"""
