@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.config import Config
 from src.display_manager import DisplayManager
 from src.text_renderer import TextParser
-from src.aio_client import AIOClient, WeatherClient
+from src.aio_client import AIOClient
+from src.owm_client import OWMClient
 from src.rtc_sync import RTCSync
 
 
@@ -198,8 +199,9 @@ class LEDMatrixApp:
         self.aio_client = AIOClient(self.config, on_message_callback=self._on_command_received)
         self.aio_client.start()
 
-        # Initialize Weather client
-        self.weather_client = WeatherClient(self.config, on_weather_callback=self._on_weather_update)
+        # Initialize OpenWeatherMap client
+        self.weather_client = OWMClient(self.config, on_weather_callback=self._on_weather_update)
+        self.weather_client.start()
 
         # Wait for weather data to load (up to 60 seconds)
         self.running = True
