@@ -279,6 +279,9 @@ class OWMClient:
             if rain_1h > 0 or snow_1h > 0:
                 precip_chance = 100  # OWM doesn't provide % chance, only actual precip
 
+            # TESTING: Override precip chance
+            precip_chance = 75
+
             # Store weather data
             self.weather_data = {
                 'temp': temp_f,
@@ -337,7 +340,7 @@ class OWMClient:
                     'temp': temp_f,
                     'condition': condition,
                     'time': datetime.fromtimestamp(closest['dt']).strftime('%H:%M'),
-                    'precip_chance': round(precip_prob)
+                    'precip_chance': 75  # TESTING: Override to 75
                 }
 
             # Extract daily forecasts (today + next 2 days)
@@ -369,7 +372,7 @@ class OWMClient:
                         'temp_min': round(min(data_dict['temps'])),
                         'condition': most_common_condition,
                         'date': '',
-                        'precip_chance': round(max(data_dict['precip']))  # Max chance during day
+                        'precip_chance': 75  # TESTING: Override to 75
                     }
 
             logging.debug(f"Forecast processed: hourly={list(self.forecast_hourly.keys())}, daily={list(self.forecast_daily.keys())}")
