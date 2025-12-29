@@ -761,7 +761,7 @@ class DisplayManager:
 
             # Line 4: Precipitation percentage (centered) - matches daily view
             precip = panel['data'].get('precip_chance', 0)
-            precip_str = f"{precip}%"
+            precip_str = f"{precip}"
             precip_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, precip_str)
             precip_x = x_offset + (w - precip_w) // 2
             graphics.DrawText(self.canvas, font_tiny, precip_x,
@@ -823,7 +823,7 @@ class DisplayManager:
             condition = panel['data'].get('condition', 'Clear')
             abbrev = self._abbreviate_condition(condition)
             precip = panel['data'].get('precip_chance', 0)
-            precip_str = f"{precip}%"
+            precip_str = f"{precip}"
 
             cond_rgb = palette.get(1, (255, 255, 255))
             cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
