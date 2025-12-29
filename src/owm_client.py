@@ -86,29 +86,41 @@ class OWMClient:
         elif 600 <= condition_id < 700:
             if condition_id == 600:
                 return "LightSnow"
-            elif condition_id in [601, 602]:
+            elif condition_id == 601:
                 return "Snow"
+            elif condition_id == 602:
+                return "HeavySnow"
             elif condition_id == 611:
-                return "IcePellets"
-            elif condition_id in [612, 613]:
-                return "LightIcePellets"
+                return "IcePellets"  # Sleet
+            elif condition_id == 612:
+                return "LightFreezingRain"  # Light shower sleet
+            elif condition_id == 613:
+                return "FreezingRain"  # Shower sleet
             elif condition_id == 615:
-                return "LightSnow"
+                return "LightSnow"  # Light rain and snow
             elif condition_id == 616:
-                return "Snow"
+                return "Snow"  # Rain and snow
             elif condition_id == 620:
-                return "LightSnow"
-            elif condition_id in [621, 622]:
-                return "Snow"
+                return "Flurries"  # Light shower snow
+            elif condition_id == 621:
+                return "Snow"  # Shower snow
+            elif condition_id == 622:
+                return "HeavySnow"  # Heavy shower snow
             else:
                 return "Snow"
 
         # Atmosphere (701-781)
         elif 700 <= condition_id < 800:
-            if condition_id == 701:
-                return "Fog"
-            elif condition_id in [711, 721, 731, 741, 751, 761, 762]:
-                return "Fog"
+            if condition_id in [701, 711, 721]:
+                return "LightFog"  # Mist, smoke, haze
+            elif condition_id in [731, 741, 751, 761]:
+                return "Fog"  # Dust, fog, sand, dust
+            elif condition_id == 762:
+                return "Fog"  # Volcanic ash
+            elif condition_id == 771:
+                return "Fog"  # Squalls
+            elif condition_id == 781:
+                return "Thunderstorms"  # Tornado (use thunderstorm icon)
             else:
                 return "Fog"
 
