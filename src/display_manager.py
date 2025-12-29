@@ -768,16 +768,15 @@ class DisplayManager:
                              24 + self.font_ascents.get(1, 5), cond_color, precip_str)
 
     def _render_daily_view(self, daily_forecasts: dict, current_weather: dict = None):
-        """Render 3-panel daily forecast: TODAY | TMR | D+2"""
+        """Render 2-panel daily forecast with icons: TODAY | TOMORROW"""
         palette = self.config.get_palette()
         font_tiny = self.fonts.get(1)
         font_small = self.fonts.get(2)
 
-        day_labels = ['TODAY', 'TMR', 'DAY+2']
+        day_labels = ['TODAY', 'TMR']
         panels = [
-            {'x': 0, 'width': 21, 'label': day_labels[0], 'data': daily_forecasts.get(0), 'type': 'forecast'},
-            {'x': 21, 'width': 21, 'label': day_labels[1], 'data': daily_forecasts.get(1), 'type': 'forecast'},
-            {'x': 43, 'width': 21, 'label': day_labels[2], 'data': daily_forecasts.get(2), 'type': 'forecast'}
+            {'x': 0, 'width': 32, 'label': day_labels[0], 'data': daily_forecasts.get(0)},
+            {'x': 32, 'width': 32, 'label': day_labels[1], 'data': daily_forecasts.get(1)}
         ]
 
         for panel in panels:
@@ -787,62 +786,72 @@ class DisplayManager:
             x_offset = panel['x']
             w = panel['width']
 
-            # Line 1: Day label (centered, from palette)
-            label_rgb = palette.get(1, (255, 255, 255))  # White (dimmed at night)
+            # Get weather data
+            temp_max = panel['data'].get('temp_max', 0)
+            temp_min = panel['data'].get('temp_min', 0)
+            condition = panel['data'].get('condition', 'Clear')
+            precip = panel['data'].get('precip_chance', 0)
+            is_night = panel['data'].get('is_night', self.config._is_night)
+
+            # Row 0-5: Day label (centered)
+            label_rgb = palette.get(1, (255, 255, 255))
             label_color = graphics.Color(label_rgb[0], label_rgb[1], label_rgb[2])
             label_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, label_color, panel['label'])
             label_x = x_offset + (w - label_w) // 2
-            graphics.DrawText(self.canvas, font_tiny, label_x,
-                             self.font_ascents.get(1, 5), label_color, panel['label'])
+            graphics.DrawText(self.canvas, font_tiny, label_x, 0 + self.font_ascents.get(1, 5), label_color, panel['label'])
 
-            # Line 2: High temp
-            temp_max = panel['data'].get('temp_max', 0)
-            high_str = str(temp_max)
+            # Row 6-29: Weather icon (24x24, centered)
+            icon_path = self._get_weather_icon_path(condition, is_night)
+            if icon_path and icon_path.exists():
+                try:
+                    icon = Image.open(icon_path)
+                    if icon.size != (24, 24):
+                        icon = icon.resize((24, 24))
+                    if icon.mode != 'RGB':
+                        icon = icon.convert('RGB')
+
+                    # Center icon horizontally in panel (32px wide, icon 24px = 4px margin on each side)
+                    icon_x = x_offset + 4
+                    icon_y = 6
+
+                    # Adjust brightness to match palette
+                    brightness_multiplier = 0.5 if is_night else 2.0
+
+                    for y in range(24):
+                        for x in range(24):
+                            r, g, b = icon.getpixel((x, y))
+                            if r > 0 or g > 0 or b > 0:  # Skip black pixels (transparent)
+                                r = min(255, int(r * brightness_multiplier))
+                                g = min(255, int(g * brightness_multiplier))
+                                b = min(255, int(b * brightness_multiplier))
+                                self.canvas.SetPixel(icon_x + x, icon_y + y, r, g, b)
+                except Exception as e:
+                    logging.error(f"Error loading icon for {condition}: {e}")
+
+            # Temps to the right of icon (x_offset + 28 to x_offset + 31)
+            # High temp
             high_idx = self._get_temp_color_index(temp_max)
             high_rgb = palette.get(high_idx, (255, 255, 255))
             high_color = graphics.Color(high_rgb[0], high_rgb[1], high_rgb[2])
+            graphics.DrawText(self.canvas, font_tiny, x_offset + 28, 12, high_color, str(temp_max))
 
-            high_w = graphics.DrawText(self.canvas, font_small, -1000, 0, high_color, high_str)
-            high_x = x_offset + (w - high_w) // 2
-            graphics.DrawText(self.canvas, font_small, high_x,
-                             8 + self.font_ascents.get(2, 7), high_color, high_str)
-
-            # Line 3: Low temp
-            temp_min = panel['data'].get('temp_min', 0)
-            low_str = str(temp_min)
+            # Low temp
             low_idx = self._get_temp_color_index(temp_min)
             low_rgb = palette.get(low_idx, (255, 255, 255))
             low_color = graphics.Color(low_rgb[0], low_rgb[1], low_rgb[2])
+            graphics.DrawText(self.canvas, font_tiny, x_offset + 28, 20, low_color, str(temp_min))
 
-            low_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, low_color, low_str)
-            low_x = x_offset + (w - low_w) // 2
-            graphics.DrawText(self.canvas, font_tiny, low_x,
-                             17 + self.font_ascents.get(1, 5), low_color, low_str)
-
-            # Line 4: Condition + precipitation (2px spacing)
-            condition = panel['data'].get('condition', 'Clear')
+            # Row 30-31: Condition + precipitation (centered)
             abbrev = self._abbreviate_condition(condition)
-            precip = panel['data'].get('precip_chance', 0)
             precip_str = f"{precip}"
+            info_text = f"{abbrev} {precip_str}"
 
-            cond_rgb = palette.get(1, (255, 255, 255))
-            cond_color = graphics.Color(cond_rgb[0], cond_rgb[1], cond_rgb[2])
+            white_rgb = palette.get(1, (255, 255, 255))
+            white_color = graphics.Color(white_rgb[0], white_rgb[1], white_rgb[2])
 
-            # Calculate total width with 2px spacing
-            abbrev_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, abbrev)
-            precip_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, cond_color, precip_str)
-            total_w = abbrev_w + 2 + precip_w  # 2px spacing
-
-            # Center the combined text
-            start_x = x_offset + (w - total_w) // 2
-
-            # Draw condition
-            graphics.DrawText(self.canvas, font_tiny, start_x,
-                             24 + self.font_ascents.get(1, 5), cond_color, abbrev)
-
-            # Draw precip 2px after condition
-            graphics.DrawText(self.canvas, font_tiny, start_x + abbrev_w + 2,
-                             24 + self.font_ascents.get(1, 5), cond_color, precip_str)
+            info_w = graphics.DrawText(self.canvas, font_tiny, -1000, 0, white_color, info_text)
+            info_x = x_offset + (w - info_w) // 2
+            graphics.DrawText(self.canvas, font_tiny, info_x, 30, white_color, info_text)
 
     def _render_progress_bar(self, elapsed_seconds: float):
         """Render animated progress bar on row 31"""
