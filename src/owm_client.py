@@ -50,6 +50,86 @@ class OWMClient:
 
         logging.info(f"OWM Client initialized for lat={self.lat}, lon={self.lon}")
 
+    def _map_owm_condition(self, owm_main: str, condition_id: int) -> str:
+        """
+        Map OpenWeatherMap condition codes to icon-compatible format
+
+        OWM Codes: https://openweathermap.org/weather-conditions
+
+        Args:
+            owm_main: Main weather category (Clear, Clouds, Rain, etc.)
+            condition_id: Detailed condition ID (800, 801, 500, etc.)
+
+        Returns:
+            Icon-compatible condition string
+        """
+        # Thunderstorm (200-232)
+        if 200 <= condition_id < 300:
+            return "Thunderstorms"
+
+        # Drizzle (300-321)
+        elif 300 <= condition_id < 400:
+            return "Drizzle"
+
+        # Rain (500-531)
+        elif 500 <= condition_id < 600:
+            if condition_id == 500:
+                return "LightRain"
+            elif condition_id in [501, 502, 503, 504]:
+                return "Rain"
+            elif condition_id >= 520:
+                return "HeavyRain"
+            else:
+                return "Rain"
+
+        # Snow (600-622)
+        elif 600 <= condition_id < 700:
+            if condition_id == 600:
+                return "LightSnow"
+            elif condition_id in [601, 602]:
+                return "Snow"
+            elif condition_id == 611:
+                return "IcePellets"
+            elif condition_id in [612, 613]:
+                return "LightIcePellets"
+            elif condition_id == 615:
+                return "LightSnow"
+            elif condition_id == 616:
+                return "Snow"
+            elif condition_id == 620:
+                return "LightSnow"
+            elif condition_id in [621, 622]:
+                return "Snow"
+            else:
+                return "Snow"
+
+        # Atmosphere (701-781)
+        elif 700 <= condition_id < 800:
+            if condition_id == 701:
+                return "Fog"
+            elif condition_id in [711, 721, 731, 741, 751, 761, 762]:
+                return "Fog"
+            else:
+                return "Fog"
+
+        # Clear (800)
+        elif condition_id == 800:
+            return "Clear"
+
+        # Clouds (801-804)
+        elif 801 <= condition_id <= 804:
+            if condition_id == 801:
+                return "MostlyClear"  # Few clouds (11-25%)
+            elif condition_id == 802:
+                return "PartlyCloudy"  # Scattered clouds (25-50%)
+            elif condition_id == 803:
+                return "MostlyCloudy"  # Broken clouds (51-84%)
+            elif condition_id == 804:
+                return "Cloudy"  # Overcast (85-100%)
+
+        # Default fallback
+        return "Clear"
+
     def start(self):
         """Start automatic weather updates"""
         if self.running:
@@ -150,7 +230,10 @@ class OWMClient:
             wind_mph = round(wind_speed_ms * 2.237)
             wind_deg = wind.get('deg', 0)
 
-            condition = weather.get('main', 'Clear')
+            # Map OpenWeatherMap condition codes to display icon format
+            owm_condition = weather.get('main', 'Clear')
+            condition_id = weather.get('id', 800)
+            condition = self._map_owm_condition(owm_condition, condition_id)
 
             # Calculate wind direction
             dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
@@ -233,7 +316,9 @@ class OWMClient:
                 weather = closest.get('weather', [{}])[0]
 
                 temp_f = round(main.get('temp', 0))
-                condition = weather.get('main', 'Clear')
+                owm_condition = weather.get('main', 'Clear')
+                condition_id = weather.get('id', 800)
+                condition = self._map_owm_condition(owm_condition, condition_id)
                 precip_prob = closest.get('pop', 0) * 100  # Probability of precipitation
 
                 self.forecast_hourly[hours] = {
@@ -254,16 +339,23 @@ class OWMClient:
 
                 if 1 <= day_offset <= 2:  # Tomorrow and day after
                     daily_temps[day_offset]['temps'].append(item['main']['temp'])
-                    daily_temps[day_offset]['conditions'].append(item['weather'][0]['main'])
+                    # Store mapped condition
+                    owm_cond = item['weather'][0]['main']
+                    cond_id = item['weather'][0]['id']
+                    mapped_cond = self._map_owm_condition(owm_cond, cond_id)
+                    daily_temps[day_offset]['conditions'].append(mapped_cond)
                     daily_temps[day_offset]['precip'].append(item.get('pop', 0) * 100)
 
             # Calculate daily summary
             for day, data_dict in daily_temps.items():
                 if data_dict['temps']:
+                    # Most common mapped condition
+                    most_common_condition = max(set(data_dict['conditions']), key=data_dict['conditions'].count)
+
                     self.forecast_daily[day] = {
                         'temp_max': round(max(data_dict['temps'])),
                         'temp_min': round(min(data_dict['temps'])),
-                        'condition': max(set(data_dict['conditions']), key=data_dict['conditions'].count),  # Most common
+                        'condition': most_common_condition,
                         'date': '',
                         'precip_chance': round(max(data_dict['precip']))  # Max chance during day
                     }
