@@ -737,8 +737,9 @@ class DisplayManager:
                 else:
                     self._render_daily_view(daily_forecasts, current_weather)
 
-                # Draw progress bar on row 31
-                self._render_progress_bar(elapsed_seconds)
+                # Don't draw progress bar on first frame after flip (elapsed_seconds ~0)
+                # This prevents visual "jump" from 100% to 0%
+                # Progress bar will appear on next frame when doing incremental updates
 
                 self.carousel_needs_redraw = False
             else:
