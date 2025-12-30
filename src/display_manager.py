@@ -888,8 +888,8 @@ class DisplayManager:
                     icon_x = start_x
                     icon_y = 4  # Move up 4px from previous position
 
-                    # Brightness: 0.75x at night, 1.0x during day
-                    brightness_multiplier = 0.75 if self.config._is_night else 1.0
+                    # Brightness: 0.125x at night, 1.0x during day (87.5% dimmer)
+                    brightness_multiplier = 0.125 if self.config._is_night else 1.0
                     logging.info(f"Daily forecast brightness: night_mode={self.config._is_night}, multiplier={brightness_multiplier}")
 
                     for y in range(20):
