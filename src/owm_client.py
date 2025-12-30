@@ -362,7 +362,13 @@ class OWMClient:
             for day, data_dict in daily_temps.items():
                 if data_dict['temps']:
                     # Most common mapped condition
-                    most_common_condition = max(set(data_dict['conditions']), key=data_dict['conditions'].count)
+                    if data_dict['conditions']:
+                        most_common_condition = max(set(data_dict['conditions']), key=data_dict['conditions'].count)
+                    else:
+                        most_common_condition = 'Clear'
+                        logging.warning(f"No conditions found for day {day}, defaulting to Clear")
+
+                    logging.debug(f"Day {day} forecast: temps={data_dict['temps'][:3]}..., conditions={data_dict['conditions'][:3]}..., most_common={most_common_condition}")
 
                     self.forecast_daily[day] = {
                         'temp_max': round(max(data_dict['temps'])),
