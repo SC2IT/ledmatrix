@@ -9,6 +9,120 @@ import requests
 from typing import Optional, Callable, Dict
 from datetime import datetime
 from threading import Thread, Event, Lock
+from dataclasses import dataclass, field
+from functools import lru_cache
+
+
+@dataclass
+class WeatherData:
+    """Current weather conditions with full Python type safety"""
+    temp: int
+    temp_color: int
+    feels_like: int
+    feels_like_color: int
+    wind_speed: int
+    wind_gust: int
+    wind_dir: str
+    humidity: int
+    pressure: float
+    pressure_trend: str
+    is_night: bool
+    condition: str
+    precip_chance: int
+    uvi: float
+    dew_point: int
+    clouds: int
+    visibility: int
+
+    def to_dict(self) -> Dict:
+        """Convert to dict for backwards compatibility"""
+        return {
+            'temp': self.temp,
+            'temp_color': self.temp_color,
+            'feels_like': self.feels_like,
+            'feels_like_color': self.feels_like_color,
+            'wind_speed': self.wind_speed,
+            'wind_gust': self.wind_gust,
+            'wind_dir': self.wind_dir,
+            'humidity': self.humidity,
+            'pressure': self.pressure,
+            'pressure_trend': self.pressure_trend,
+            'is_night': self.is_night,
+            'condition': self.condition,
+            'precip_chance': self.precip_chance,
+            'uvi': self.uvi,
+            'dew_point': self.dew_point,
+            'clouds': self.clouds,
+            'visibility': self.visibility
+        }
+
+
+@dataclass
+class HourlyForecast:
+    """Hourly forecast data with type safety"""
+    temp: int
+    condition: str
+    time: str
+    precip_chance: int
+    wind_speed: int
+    wind_gust: int
+    humidity: int
+    uvi: float
+
+    def to_dict(self) -> Dict:
+        """Convert to dict for backwards compatibility"""
+        return {
+            'temp': self.temp,
+            'condition': self.condition,
+            'time': self.time,
+            'precip_chance': self.precip_chance,
+            'wind_speed': self.wind_speed,
+            'wind_gust': self.wind_gust,
+            'humidity': self.humidity,
+            'uvi': self.uvi
+        }
+
+
+@dataclass
+class DailyForecast:
+    """Daily forecast data with type safety"""
+    temp_max: int
+    temp_min: int
+    temp_day: int
+    temp_night: int
+    temp_eve: int
+    temp_morn: int
+    condition: str
+    date: str
+    precip_chance: int
+    summary: str
+    humidity: int
+    wind_speed: int
+    wind_gust: int
+    uvi: float
+    sunrise: int
+    sunset: int
+
+    def to_dict(self) -> Dict:
+        """Convert to dict for backwards compatibility"""
+        return {
+            'temp_max': self.temp_max,
+            'temp_min': self.temp_min,
+            'temp_day': self.temp_day,
+            'temp_night': self.temp_night,
+            'temp_eve': self.temp_eve,
+            'temp_morn': self.temp_morn,
+            'condition': self.condition,
+            'date': self.date,
+            'precip_chance': self.precip_chance,
+            'summary': self.summary,
+            'humidity': self.humidity,
+            'wind_speed': self.wind_speed,
+            'wind_gust': self.wind_gust,
+            'uvi': self.uvi,
+            'sunrise': self.sunrise,
+            'sunset': self.sunset
+        }
 
 
 class OWMClient:
@@ -50,9 +164,13 @@ class OWMClient:
 
         logging.info(f"OWM Client initialized for lat={self.lat}, lon={self.lon}")
 
+    @lru_cache(maxsize=256)
     def _map_owm_condition(self, owm_main: str, condition_id: int) -> str:
         """
-        Map OpenWeatherMap condition codes to icon-compatible format
+        Map OpenWeatherMap condition codes to icon-compatible format.
+
+        Cached to avoid repeated string processing for same condition codes.
+        With ~100 possible OWM condition codes, 256 cache entries is sufficient.
 
         OWM Codes: https://openweathermap.org/weather-conditions
 
@@ -272,26 +390,28 @@ class OWMClient:
             if rain_1h > 0 or snow_1h > 0:
                 precip_chance = 100  # Current conditions don't have pop, only actual precip
 
-            # Store weather data
-            self.weather_data = {
-                'temp': temp_f,
-                'temp_color': get_temp_color(temp_f),
-                'feels_like': feels_f,
-                'feels_like_color': get_temp_color(feels_f),
-                'wind_speed': wind_speed_mph,
-                'wind_gust': wind_gust_mph,  # NEW
-                'wind_dir': wind_dir_str,
-                'humidity': humidity,
-                'pressure': pressure_inhg,
-                'pressure_trend': 'steady',  # OWM doesn't provide trend
-                'is_night': is_night,
-                'condition': condition,
-                'precip_chance': precip_chance,
-                'uvi': uvi,  # NEW
-                'dew_point': dew_point_f,  # NEW
-                'clouds': clouds,  # NEW
-                'visibility': visibility  # NEW
-            }
+            # Store weather data as typed dataclass (convert to dict for backwards compatibility)
+            weather_obj = WeatherData(
+                temp=temp_f,
+                temp_color=get_temp_color(temp_f),
+                feels_like=feels_f,
+                feels_like_color=get_temp_color(feels_f),
+                wind_speed=wind_speed_mph,
+                wind_gust=wind_gust_mph,
+                wind_dir=wind_dir_str,
+                humidity=humidity,
+                pressure=pressure_inhg,
+                pressure_trend='steady',  # OWM doesn't provide trend
+                is_night=is_night,
+                condition=condition,
+                precip_chance=precip_chance,
+                uvi=uvi,
+                dew_point=dew_point_f,
+                clouds=clouds,
+                visibility=visibility
+            )
+            # Convert to dict for backwards compatibility with existing display code
+            self.weather_data = weather_obj.to_dict()
 
             # Update day/night mode
             was_night = self.config._is_night
@@ -319,16 +439,18 @@ class OWMClient:
                         condition = self._map_owm_condition(owm_condition, condition_id)
                         precip_prob = hour_data.get('pop', 0) * 100  # Probability of precipitation
 
-                        self.forecast_hourly[hours] = {
-                            'temp': temp_f,
-                            'condition': condition,
-                            'time': datetime.fromtimestamp(hour_data['dt']).strftime('%H:%M'),
-                            'precip_chance': round(precip_prob),
-                            'wind_speed': round(hour_data.get('wind_speed', 0)),
-                            'wind_gust': round(hour_data.get('wind_gust', 0)),
-                            'humidity': round(hour_data.get('humidity', 0)),
-                            'uvi': round(hour_data.get('uvi', 0), 1)
-                        }
+                        # Create typed dataclass (convert to dict for backwards compatibility)
+                        hourly_obj = HourlyForecast(
+                            temp=temp_f,
+                            condition=condition,
+                            time=datetime.fromtimestamp(hour_data['dt']).strftime('%H:%M'),
+                            precip_chance=round(precip_prob),
+                            wind_speed=round(hour_data.get('wind_speed', 0)),
+                            wind_gust=round(hour_data.get('wind_gust', 0)),
+                            humidity=round(hour_data.get('humidity', 0)),
+                            uvi=round(hour_data.get('uvi', 0), 1)
+                        )
+                        self.forecast_hourly[hours] = hourly_obj.to_dict()
 
             # Process daily forecasts (8 days available, use days 0-2)
             if daily_list:
@@ -356,24 +478,26 @@ class OWMClient:
                     # Summary (One Call API provides this!)
                     summary = day_data.get('summary', '')
 
-                    self.forecast_daily[day_offset] = {
-                        'temp_max': temp_max,
-                        'temp_min': temp_min,
-                        'temp_day': temp_day,  # NEW
-                        'temp_night': temp_night,  # NEW
-                        'temp_eve': temp_eve,  # NEW
-                        'temp_morn': temp_morn,  # NEW
-                        'condition': condition,
-                        'date': datetime.fromtimestamp(day_data['dt']).strftime('%a %m/%d'),
-                        'precip_chance': round(precip_prob),
-                        'summary': summary,  # NEW
-                        'humidity': round(day_data.get('humidity', 0)),
-                        'wind_speed': round(day_data.get('wind_speed', 0)),
-                        'wind_gust': round(day_data.get('wind_gust', 0)),
-                        'uvi': round(day_data.get('uvi', 0), 1),
-                        'sunrise': day_data.get('sunrise', 0),
-                        'sunset': day_data.get('sunset', 0)
-                    }
+                    # Create typed dataclass (convert to dict for backwards compatibility)
+                    daily_obj = DailyForecast(
+                        temp_max=temp_max,
+                        temp_min=temp_min,
+                        temp_day=temp_day,
+                        temp_night=temp_night,
+                        temp_eve=temp_eve,
+                        temp_morn=temp_morn,
+                        condition=condition,
+                        date=datetime.fromtimestamp(day_data['dt']).strftime('%a %m/%d'),
+                        precip_chance=round(precip_prob),
+                        summary=summary,
+                        humidity=round(day_data.get('humidity', 0)),
+                        wind_speed=round(day_data.get('wind_speed', 0)),
+                        wind_gust=round(day_data.get('wind_gust', 0)),
+                        uvi=round(day_data.get('uvi', 0), 1),
+                        sunrise=day_data.get('sunrise', 0),
+                        sunset=day_data.get('sunset', 0)
+                    )
+                    self.forecast_daily[day_offset] = daily_obj.to_dict()
 
             logging.debug(f"Forecast processed: hourly={list(self.forecast_hourly.keys())}, daily={list(self.forecast_daily.keys())}")
 
