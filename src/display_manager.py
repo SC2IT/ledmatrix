@@ -852,27 +852,28 @@ class DisplayManager:
             label_x = x_offset + (w - label_w) // 2
             graphics.DrawText(self.canvas, font_tiny, label_x, 0 + self.font_ascents.get(1, 5), label_color, panel['label'])
 
-            # Row 6-29: Weather icon (24x24, centered)
+            # Row 6-29: Weather icon (20x20, centered for daily forecast)
             icon_path = self._get_weather_icon_path(condition, is_night)
             logging.debug(f"Daily forecast icon: condition={condition}, is_night={is_night}, path={icon_path}")
             if icon_path and icon_path.exists():
                 try:
                     logging.info(f"Loading daily forecast icon: {icon_path}")
                     icon = Image.open(icon_path)
-                    if icon.size != (24, 24):
-                        icon = icon.resize((24, 24))
+                    # Resize to 20x20 for daily forecast (smaller than weather display)
+                    if icon.size != (20, 20):
+                        icon = icon.resize((20, 20))
                     if icon.mode != 'RGB':
                         icon = icon.convert('RGB')
 
-                    # Center icon horizontally in panel (32px wide, icon 24px = 4px margin on each side)
-                    icon_x = x_offset + 4
+                    # Center icon horizontally in panel (32px wide, icon 20px = 6px margin on each side)
+                    icon_x = x_offset + 6
                     icon_y = 6
 
-                    # Adjust brightness to match palette
-                    brightness_multiplier = 0.5 if is_night else 2.0
+                    # Reduce brightness to match night palette (0.5x for both day and night)
+                    brightness_multiplier = 0.5
 
-                    for y in range(24):
-                        for x in range(24):
+                    for y in range(20):
+                        for x in range(20):
                             r, g, b = icon.getpixel((x, y))
                             if r > 0 or g > 0 or b > 0:  # Skip black pixels (transparent)
                                 r = min(255, int(r * brightness_multiplier))
