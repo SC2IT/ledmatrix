@@ -919,41 +919,64 @@ class DisplayManager:
         # Map Apple WeatherKit condition codes to Tomorrow.io icon codes
         # Format: {code}{night_flag}_{description}_small.bmp
         # Night flag: 1 suffix for night (e.g., 10001 for clear night)
-        icon_map = {
-            "Clear": "1000_clear_sunny",
-            "MostlyClear": "1100_mostly_clear",
-            "PartlyCloudy": "1101_partly_cloudy",
-            "MostlyCloudy": "1102_mostly_cloudy",
-            "Cloudy": "1001_cloudy",
-            "Fog": "2000_fog",
-            "LightFog": "2100_fog_light",
-            "Drizzle": "4000_drizzle",
-            "Rain": "4001_rain",
-            "LightRain": "4200_rain_light",
-            "HeavyRain": "4201_rain_heavy",
-            "Snow": "5000_snow",
-            "Flurries": "5001_flurries",
-            "LightSnow": "5100_snow_light",
-            "HeavySnow": "5101_snow_heavy",
-            "FreezingDrizzle": "6000_freezing_rain_drizzle",
-            "FreezingRain": "6001_freezing_rain",
-            "LightFreezingRain": "6200_freezing_rain_light",
-            "HeavyFreezingRain": "6201_freezing_rain_heavy",
-            "IcePellets": "7000_ice_pellets",
-            "HeavyIcePellets": "7101_ice_pellets_heavy",
-            "LightIcePellets": "7102_ice_pellets_light",
-            "Thunderstorms": "8000_tstorm",
-        }
+        # Note: "Clear" has different day/night descriptions (sunny vs night)
 
-        icon_base = icon_map.get(condition, "1000_clear_sunny")
-        logging.debug(f"Icon mapping: '{condition}' -> '{icon_base}'")
-
-        # Add night suffix if nighttime (1 gets appended to code)
+        # Use separate maps for day and night
         if is_night:
-            # Insert '1' before the underscore (e.g., "1000" -> "10001")
-            parts = icon_base.split('_', 1)
-            icon_base = f"{parts[0]}1_{parts[1]}"
-            logging.debug(f"Night mode: icon_base adjusted to '{icon_base}'")
+            icon_map = {
+                "Clear": "10001_clear_night",  # Special case: different description for night
+                "MostlyClear": "11001_mostly_clear",
+                "PartlyCloudy": "11011_partly_cloudy",
+                "MostlyCloudy": "11021_mostly_cloudy",
+                "Cloudy": "10011_cloudy",
+                "Fog": "20001_fog",
+                "LightFog": "21001_fog_light",
+                "Drizzle": "40001_drizzle",
+                "Rain": "40011_rain",
+                "LightRain": "42001_rain_light",
+                "HeavyRain": "42011_rain_heavy",
+                "Snow": "50001_snow",
+                "Flurries": "50011_flurries",
+                "LightSnow": "51001_snow_light",
+                "HeavySnow": "51011_snow_heavy",
+                "FreezingDrizzle": "60001_freezing_rain_drizzle",
+                "FreezingRain": "60011_freezing_rain",
+                "LightFreezingRain": "62001_freezing_rain_light",
+                "HeavyFreezingRain": "62011_freezing_rain_heavy",
+                "IcePellets": "70001_ice_pellets",
+                "HeavyIcePellets": "71011_ice_pellets_heavy",
+                "LightIcePellets": "71021_ice_pellets_light",
+                "Thunderstorms": "80001_tstorm",
+            }
+        else:
+            icon_map = {
+                "Clear": "1000_clear_sunny",
+                "MostlyClear": "1100_mostly_clear",
+                "PartlyCloudy": "1101_partly_cloudy",
+                "MostlyCloudy": "1102_mostly_cloudy",
+                "Cloudy": "1001_cloudy",
+                "Fog": "2000_fog",
+                "LightFog": "2100_fog_light",
+                "Drizzle": "4000_drizzle",
+                "Rain": "4001_rain",
+                "LightRain": "4200_rain_light",
+                "HeavyRain": "4201_rain_heavy",
+                "Snow": "5000_snow",
+                "Flurries": "5001_flurries",
+                "LightSnow": "5100_snow_light",
+                "HeavySnow": "5101_snow_heavy",
+                "FreezingDrizzle": "6000_freezing_rain_drizzle",
+                "FreezingRain": "6001_freezing_rain",
+                "LightFreezingRain": "6200_freezing_rain_light",
+                "HeavyFreezingRain": "6201_freezing_rain_heavy",
+                "IcePellets": "7000_ice_pellets",
+                "HeavyIcePellets": "7101_ice_pellets_heavy",
+                "LightIcePellets": "7102_ice_pellets_light",
+                "Thunderstorms": "8000_tstorm",
+            }
+
+        icon_base = icon_map.get(condition, "1000_clear_sunny" if not is_night else "10001_clear_night")
+        logging.debug(f"Icon mapping ({'night' if is_night else 'day'}): '{condition}' -> '{icon_base}'")
 
         # Icons are BMP files with _small suffix
         icon_path = icon_dir / f"{icon_base}_small.bmp"
