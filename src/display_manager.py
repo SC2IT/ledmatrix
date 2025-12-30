@@ -930,7 +930,7 @@ class DisplayManager:
                 try:
                     # Position icon at start of centered group
                     icon_x = start_x
-                    icon_y = 4  # Move up 4px from previous position
+                    icon_y = 6  # Positioned 6px from top
 
                     # Brightness: 0.125x at night, 1.0x during day (87.5% dimmer)
                     brightness_multiplier = self._get_icon_brightness_multiplier(self.config._is_night, mode='forecast')
