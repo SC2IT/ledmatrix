@@ -310,7 +310,7 @@ class DisplayManager:
 
             if icon_path and icon_path.exists():
                 try:
-                    logging.info(f"Loading weather icon: {icon_path}")
+                    logging.debug(f"Loading weather icon: {icon_path}")
                     icon = Image.open(icon_path)
                     # Resize if needed (assuming icons are 24x24)
                     if icon.size != (24, 24):
@@ -337,7 +337,7 @@ class DisplayManager:
                                     g = min(255, int(g * brightness_multiplier))
                                     b = min(255, int(b * brightness_multiplier))
                                     self.canvas.SetPixel(x + 40, y, r, g, b)
-                    logging.info("Weather icon drawn successfully")
+                    logging.debug("Weather icon drawn successfully")
                 except Exception as e:
                     logging.error(f"Error loading weather icon: {e}", exc_info=True)
             else:
@@ -502,7 +502,7 @@ class DisplayManager:
 
                 if icon_path and icon_path.exists():
                     try:
-                        logging.info(f"Loading Weather on 8s icon: {icon_path}")
+                        logging.debug(f"Loading Weather on 8s icon: {icon_path}")
                         icon = Image.open(icon_path)
                         if icon.size != (24, 24):
                             icon = icon.resize((24, 24))
@@ -521,7 +521,7 @@ class DisplayManager:
                                         g = min(255, int(g * brightness_multiplier))
                                         b = min(255, int(b * brightness_multiplier))
                                         self.canvas.SetPixel(x + 40, y, r, g, b)
-                        logging.info("Weather on 8s icon drawn successfully")
+                        logging.debug("Weather on 8s icon drawn successfully")
                     except Exception as e:
                         logging.error(f"Error loading Weather on 8s icon: {e}", exc_info=True)
                 else:
@@ -876,7 +876,7 @@ class DisplayManager:
             logging.debug(f"Daily forecast icon: condition={condition}, is_night={is_night}, path={icon_path}")
             if icon_path and icon_path.exists():
                 try:
-                    logging.info(f"Loading daily forecast icon: {icon_path}")
+                    logging.debug(f"Loading daily forecast icon: {icon_path}")
                     icon = Image.open(icon_path)
                     # Resize to 20x20 for daily forecast
                     if icon.size != (20, 20):
@@ -890,7 +890,7 @@ class DisplayManager:
 
                     # Brightness: 0.125x at night, 1.0x during day (87.5% dimmer)
                     brightness_multiplier = 0.125 if self.config._is_night else 1.0
-                    logging.info(f"Daily forecast brightness: night_mode={self.config._is_night}, multiplier={brightness_multiplier}")
+                    logging.debug(f"Daily forecast brightness: night_mode={self.config._is_night}, multiplier={brightness_multiplier}")
 
                     for y in range(20):
                         for x in range(20):
@@ -1076,7 +1076,7 @@ class DisplayManager:
         """Ensure hardware brightness stays constant regardless of day/night mode"""
         if self.matrix:
             palette_type = "NIGHT" if self.config._is_night else "DAY"
-            logging.info(f"sync_brightness: HW brightness={self.config.brightness}, Palette={palette_type}")
+            logging.debug(f"sync_brightness: HW brightness={self.config.brightness}, Palette={palette_type}")
             self.matrix.brightness = self.config.brightness
 
     def __del__(self):
