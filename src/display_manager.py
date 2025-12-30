@@ -801,8 +801,8 @@ class DisplayManager:
 
         day_labels = ['TODAY', 'TMR']
         panels = [
-            {'x': 0, 'width': 32, 'label': day_labels[0], 'data': daily_forecasts.get(0)},
-            {'x': 32, 'width': 32, 'label': day_labels[1], 'data': daily_forecasts.get(1)}
+            {'x': 0, 'width': 32, 'label': day_labels[0], 'data': daily_forecasts.get(0), 'day_offset': 0},
+            {'x': 32, 'width': 32, 'label': day_labels[1], 'data': daily_forecasts.get(1), 'day_offset': 1}
         ]
 
         for panel in panels:
@@ -811,13 +811,38 @@ class DisplayManager:
 
             x_offset = panel['x']
             w = panel['width']
+            day_offset = panel['day_offset']
 
             # Get weather data
             temp_max = panel['data'].get('temp_max', 0)
             temp_min = panel['data'].get('temp_min', 0)
             condition = panel['data'].get('condition', 'Clear')
             precip = panel['data'].get('precip_chance', 0)
-            is_night = self.config._is_night  # Use current day/night mode
+
+            # Determine icon mode and temperature to display
+            # TODAY: Use night icon + low temp if within 1 hour of sunset
+            # TOMORROW+: Always use day icon + high temp
+            if day_offset == 0:  # TODAY
+                # Check if we're within 1 hour of sunset
+                sunset = panel['data'].get('sunset', 0)
+                now = time.time()
+                one_hour_before_sunset = sunset - 3600  # 1 hour = 3600 seconds
+
+                if now >= one_hour_before_sunset:
+                    # After 1 hour before sunset: show overnight forecast
+                    is_night = True
+                    display_temp = temp_min
+                    logging.debug(f"TODAY forecast: Using night mode (within 1hr of sunset), temp={temp_min}")
+                else:
+                    # Before 1 hour before sunset: show daytime forecast
+                    is_night = False
+                    display_temp = temp_max
+                    logging.debug(f"TODAY forecast: Using day mode, temp={temp_max}")
+            else:  # TOMORROW and beyond
+                # Always use day icon and high temp for future days
+                is_night = False
+                display_temp = temp_max
+                logging.debug(f"Day +{day_offset} forecast: Using day mode, temp={temp_max}")
 
             # Row 0-5: Day label (centered)
             label_rgb = palette.get(1, (255, 255, 255))
@@ -856,18 +881,16 @@ class DisplayManager:
                 except Exception as e:
                     logging.error(f"Error loading icon for {condition}: {e}")
 
-            # Temps to the right of icon (x_offset + 28 to x_offset + 31)
-            # High temp
-            high_idx = self._get_temp_color_index(temp_max)
-            high_rgb = palette.get(high_idx, (255, 255, 255))
-            high_color = graphics.Color(high_rgb[0], high_rgb[1], high_rgb[2])
-            graphics.DrawText(self.canvas, font_tiny, x_offset + 28, 12, high_color, str(temp_max))
+            # Temperature display (shows high or low based on time of day)
+            # TODAY: high before 1hr of sunset, low after
+            # TOMORROW: always high
+            temp_idx = self._get_temp_color_index(display_temp)
+            temp_rgb = palette.get(temp_idx, (255, 255, 255))
+            temp_color = graphics.Color(temp_rgb[0], temp_rgb[1], temp_rgb[2])
 
-            # Low temp
-            low_idx = self._get_temp_color_index(temp_min)
-            low_rgb = palette.get(low_idx, (255, 255, 255))
-            low_color = graphics.Color(low_rgb[0], low_rgb[1], low_rgb[2])
-            graphics.DrawText(self.canvas, font_tiny, x_offset + 28, 20, low_color, str(temp_min))
+            # Center the temperature vertically in the available space
+            temp_y = 16  # Middle position between 12 and 20
+            graphics.DrawText(self.canvas, font_tiny, x_offset + 28, temp_y, temp_color, str(display_temp))
 
             # Row 30-31: Condition + precipitation (centered)
             abbrev = self._abbreviate_condition(condition)
