@@ -98,11 +98,14 @@ class LEDMatrixApp:
             except Exception as e:
                 print(f"Warning: Could not setup file logging: {e}")
 
-        # Configure root logger
-        logging.basicConfig(
-            level=log_level,
-            handlers=handlers
-        )
+        # Configure root logger directly (basicConfig doesn't work if logging already initialized)
+        root_logger = logging.getLogger()
+        root_logger.setLevel(log_level)
+        # Clear any existing handlers
+        root_logger.handlers.clear()
+        # Add our handlers
+        for handler in handlers:
+            root_logger.addHandler(handler)
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals"""
