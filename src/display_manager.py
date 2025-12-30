@@ -497,9 +497,11 @@ class DisplayManager:
             if page == 0:
                 # Try to load and draw weather icon (top-right)
                 icon_path = self._get_weather_icon_path(condition, weather_data.get('is_night', False))
+                logging.debug(f"Weather on 8s icon path: {icon_path}")
 
                 if icon_path and icon_path.exists():
                     try:
+                        logging.info(f"Loading Weather on 8s icon: {icon_path}")
                         icon = Image.open(icon_path)
                         if icon.size != (24, 24):
                             icon = icon.resize((24, 24))
@@ -518,8 +520,11 @@ class DisplayManager:
                                         g = min(255, int(g * brightness_multiplier))
                                         b = min(255, int(b * brightness_multiplier))
                                         self.canvas.SetPixel(x + 40, y, r, g, b)
+                        logging.info("Weather on 8s icon drawn successfully")
                     except Exception as e:
-                        logging.error(f"Error loading weather icon: {e}", exc_info=True)
+                        logging.error(f"Error loading Weather on 8s icon: {e}", exc_info=True)
+                else:
+                    logging.warning(f"Weather on 8s icon not found: {icon_path}")
 
                 # Row 0-9: Temperature (large, left side)
                 temp = weather_data.get('temp', 0)
