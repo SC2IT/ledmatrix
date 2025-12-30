@@ -158,6 +158,7 @@ class LEDMatrixApp:
                 self.forecast_mode_active = True
                 self.forecast_flip_timer = 0.0
                 self.last_loop_time = time.time()
+                self.display.carousel_needs_redraw = True  # Trigger initial full redraw
                 # Initial display will happen in main loop
 
             elif cmd_upper in ["ON-CALL", "FREE", "BUSY", "QUIET", "KNOCK"]:
@@ -238,6 +239,7 @@ class LEDMatrixApp:
             logging.info("Scheduled auto-FORECAST: 5 AM weekday")
             self.forecast_mode_active = True
             self.forecast_flip_timer = 0.0
+            self.display.carousel_needs_redraw = True  # Trigger initial full redraw
             return
 
         # Saturday-Sunday at 7:00 AM
@@ -245,6 +247,7 @@ class LEDMatrixApp:
             logging.info("Scheduled auto-FORECAST: 7 AM weekend")
             self.forecast_mode_active = True
             self.forecast_flip_timer = 0.0
+            self.display.carousel_needs_redraw = True  # Trigger initial full redraw
             return
 
         # Auto-OFF at 11:00 PM (23:00) daily
@@ -331,6 +334,7 @@ class LEDMatrixApp:
                     logging.info(f"Auto-activating FORECAST mode after {self.startup_auto_forecast_timeout}s startup period")
                     self.forecast_mode_active = True
                     self.forecast_flip_timer = 0.0
+                    self.display.carousel_needs_redraw = True  # Trigger initial full redraw
                     self.startup_auto_forecast_enabled = False  # Disable after first use
 
                 # Update forecast carousel if active

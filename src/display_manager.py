@@ -34,6 +34,7 @@ class DisplayManager:
 
         # Forecast carousel state
         self.carousel_view = 0  # 0 = hourly, 1 = daily
+        self.carousel_needs_redraw = True  # Flag for full redraw vs progress-only update
 
         # Font cache
         self.fonts = {}
@@ -676,6 +677,7 @@ class DisplayManager:
     def flip_carousel_view(self):
         """Flip to next carousel view"""
         self.carousel_view = 1 - self.carousel_view
+        self.carousel_needs_redraw = True  # Trigger full redraw for new view
         logging.info(f"Carousel flipped to: {'DAILY' if self.carousel_view else 'HOURLY'}")
 
     def show_forecast_carousel(self, current_weather: dict, hourly_forecasts: dict,
@@ -686,16 +688,29 @@ class DisplayManager:
 
         try:
             self.sync_brightness_with_night_mode()
-            self.canvas.Clear()
 
-            # Render active view
-            if self.carousel_view == 0:
-                self._render_hourly_view(current_weather, hourly_forecasts)
+            # Only do full redraw when view changes or first render
+            if self.carousel_needs_redraw:
+                self.canvas.Clear()
+
+                # Render active view
+                if self.carousel_view == 0:
+                    self._render_hourly_view(current_weather, hourly_forecasts)
+                else:
+                    self._render_daily_view(daily_forecasts, current_weather)
+
+                # Draw progress bar on row 31
+                self._render_progress_bar(elapsed_seconds)
+
+                self.carousel_needs_redraw = False
             else:
-                self._render_daily_view(daily_forecasts, current_weather)
+                # Only update progress bar (row 31) - much faster!
+                # Clear row 31 by drawing black pixels
+                for x in range(self.config.display_width):
+                    self.canvas.SetPixel(x, 31, 0, 0, 0)
 
-            # Draw progress bar on row 31
-            self._render_progress_bar(elapsed_seconds)
+                # Redraw progress bar
+                self._render_progress_bar(elapsed_seconds)
 
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
