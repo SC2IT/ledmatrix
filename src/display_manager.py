@@ -36,6 +36,7 @@ class DisplayManager:
         # Forecast carousel state
         self.carousel_view = 0  # 0 = hourly, 1 = daily
         self.carousel_needs_redraw = True  # Flag for full redraw vs progress-only update
+        self.carousel_clear_frames = 0  # Counter for double-buffer clearing (need 2 frames to clear both buffers)
 
         # Font cache
         self.fonts = {}
@@ -716,6 +717,7 @@ class DisplayManager:
         """Flip to next carousel view"""
         self.carousel_view = 1 - self.carousel_view
         self.carousel_needs_redraw = True  # Trigger full redraw for new view
+        self.carousel_clear_frames = 2  # Clear both buffers to prevent flickering
         logging.info(f"Carousel flipped to: {'DAILY' if self.carousel_view else 'HOURLY'}")
 
     def show_forecast_carousel(self, current_weather: dict, hourly_forecasts: dict,
@@ -727,8 +729,11 @@ class DisplayManager:
         try:
             self.sync_brightness_with_night_mode()
 
-            # Only do full redraw when view changes or first render
-            if self.carousel_needs_redraw:
+            # Check if we need to do full redraws to clear both buffers
+            # (RGB matrix uses double-buffering, need to clear both to prevent flickering)
+            needs_full_redraw = self.carousel_needs_redraw or self.carousel_clear_frames > 0
+
+            if needs_full_redraw:
                 self.canvas.Clear()
 
                 # Render active view
@@ -737,9 +742,16 @@ class DisplayManager:
                 else:
                     self._render_daily_view(daily_forecasts, current_weather)
 
-                # Don't draw progress bar on first frame after flip (elapsed_seconds ~0)
-                # This prevents visual "jump" from 100% to 0%
-                # Progress bar will appear on next frame when doing incremental updates
+                # Don't draw progress bar during buffer clearing (first 2 frames)
+                # This prevents visual "jump" and ensures clean transition
+                if self.carousel_clear_frames == 0:
+                    # Buffers are clear, draw progress bar normally
+                    self._render_progress_bar(elapsed_seconds)
+
+                # Decrement clear counter
+                if self.carousel_clear_frames > 0:
+                    self.carousel_clear_frames -= 1
+                    logging.debug(f"Clearing buffer {2 - self.carousel_clear_frames}/2")
 
                 self.carousel_needs_redraw = False
             else:

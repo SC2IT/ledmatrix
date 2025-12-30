@@ -171,6 +171,7 @@ class LEDMatrixApp:
                 self.forecast_flip_timer = 0.0
                 self.last_loop_time = time.time()
                 self.display.carousel_needs_redraw = True  # Trigger initial full redraw
+                self.display.carousel_clear_frames = 2  # Clear both buffers to prevent flickering
                 # Initial display will happen in main loop
 
             elif cmd_upper in ["ON-CALL", "FREE", "BUSY", "QUIET", "KNOCK"]:
@@ -252,6 +253,7 @@ class LEDMatrixApp:
             self.forecast_mode_active = True
             self.forecast_flip_timer = 0.0
             self.display.carousel_needs_redraw = True  # Trigger initial full redraw
+            self.display.carousel_clear_frames = 2  # Clear both buffers
             return
 
         # Saturday-Sunday at 7:00 AM
@@ -260,6 +262,7 @@ class LEDMatrixApp:
             self.forecast_mode_active = True
             self.forecast_flip_timer = 0.0
             self.display.carousel_needs_redraw = True  # Trigger initial full redraw
+            self.display.carousel_clear_frames = 2  # Clear both buffers
             return
 
         # Auto-OFF at 11:00 PM (23:00) daily
@@ -347,6 +350,7 @@ class LEDMatrixApp:
                     self.forecast_mode_active = True
                     self.forecast_flip_timer = 0.0
                     self.display.carousel_needs_redraw = True  # Trigger initial full redraw
+                    self.display.carousel_clear_frames = 2  # Clear both buffers
                     self.startup_auto_forecast_enabled = False  # Disable after first use
 
                 # Update forecast carousel if active
