@@ -5,9 +5,10 @@ Uses hzeller/rpi-rgb-led-matrix library
 
 import logging
 import time
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
+from functools import lru_cache
 
 try:
     from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
@@ -39,6 +40,10 @@ class DisplayManager:
         # Font cache
         self.fonts = {}
         self._load_fonts()
+
+        # Weather icon cache (preload all icons to avoid disk I/O during rendering)
+        self._icon_cache: Dict[str, Image.Image] = {}
+        self._preload_weather_icons()
 
         # Initialize matrix
         if MATRIX_AVAILABLE:
@@ -150,6 +155,58 @@ class DisplayManager:
 
         except Exception as e:
             logging.warning(f"Font loading error: {e}")
+
+    def _preload_weather_icons(self):
+        """
+        Preload all weather icons into memory to avoid disk I/O during rendering.
+
+        With 512MB RAM on Pi Zero W 2, we can easily cache all icons:
+        - 24x24 RGB bitmap = 1.7 KB per icon
+        - ~70 total icons (day + night variants) = ~120 KB total
+        - Plus 20x20 small icons for daily forecast
+
+        This eliminates repeated Image.open() calls during every frame render.
+        """
+        try:
+            icon_dir = Path(__file__).parent.parent / "icons"
+            if not icon_dir.exists():
+                logging.warning(f"Icon directory not found: {icon_dir}")
+                return
+
+            # Preload all 24x24 icons (for current weather and "Weather on 8s")
+            for icon_file in icon_dir.glob("*_small.bmp"):
+                try:
+                    # Load, convert to RGB, and ensure correct size
+                    img = Image.open(icon_file).convert('RGB')
+                    if img.size != (24, 24):
+                        img = img.resize((24, 24), Image.Resampling.LANCZOS)
+
+                    # Cache with stem as key (e.g., "1001_clear_large")
+                    cache_key = f"{icon_file.stem}_24"
+                    self._icon_cache[cache_key] = img
+                    logging.debug(f"Cached icon: {cache_key}")
+
+                except Exception as e:
+                    logging.warning(f"Failed to cache icon {icon_file.name}: {e}")
+
+            # Preload 20x20 versions for daily forecast
+            for icon_file in icon_dir.glob("*_small.bmp"):
+                try:
+                    # Load and resize to 20x20 for daily forecast
+                    img = Image.open(icon_file).convert('RGB').resize((20, 20), Image.Resampling.LANCZOS)
+
+                    # Cache with size suffix
+                    cache_key = f"{icon_file.stem}_20"
+                    self._icon_cache[cache_key] = img
+                    logging.debug(f"Cached icon: {cache_key}")
+
+                except Exception as e:
+                    logging.warning(f"Failed to cache 20x20 icon {icon_file.name}: {e}")
+
+            logging.info(f"Preloaded {len(self._icon_cache)} weather icons into memory (~{len(self._icon_cache) * 2}KB)")
+
+        except Exception as e:
+            logging.error(f"Error preloading weather icons: {e}", exc_info=True)
 
     def clear(self):
         """Clear the display"""
@@ -305,27 +362,16 @@ class DisplayManager:
             self.canvas.Clear()
             logging.debug(f"Rendering weather: condition={condition}, is_night={weather_data.get('is_night', False)}")
 
-            # Try to load and draw weather icon
-            icon_path = self._get_weather_icon_path(condition, weather_data.get('is_night', False))
-            logging.debug(f"Weather icon path: {icon_path}")
+            # Get cached weather icon (24x24)
+            icon = self._get_cached_icon(condition, weather_data.get('is_night', False), size=24)
 
-            if icon_path and icon_path.exists():
+            if icon:
                 try:
-                    logging.debug(f"Loading weather icon: {icon_path}")
-                    icon = Image.open(icon_path)
-                    # Resize if needed (assuming icons are 24x24)
-                    if icon.size != (24, 24):
-                        icon = icon.resize((24, 24))
-
-                    # Convert to RGB if needed
-                    if icon.mode != 'RGB':
-                        icon = icon.convert('RGB')
-
                     # Draw icon pixel by pixel at top-right (x=40, y=0)
                     # Adjust brightness to match text (night palette is 25% = /4)
                     # Day: 2x boost, Night: 2x * 0.25 = 0.5x to match night palette
                     is_night = weather_data.get('is_night', False)
-                    brightness_multiplier = 0.5 if is_night else 2.0
+                    brightness_multiplier = self._get_icon_brightness_multiplier(is_night, mode='weather')
 
                     for y in range(min(24, self.config.display_height)):
                         for x in range(24):
@@ -338,11 +384,11 @@ class DisplayManager:
                                     g = min(255, int(g * brightness_multiplier))
                                     b = min(255, int(b * brightness_multiplier))
                                     self.canvas.SetPixel(x + 40, y, r, g, b)
-                    logging.debug("Weather icon drawn successfully")
+                    logging.debug("Weather icon drawn from cache")
                 except Exception as e:
-                    logging.error(f"Error loading weather icon: {e}", exc_info=True)
+                    logging.error(f"Error drawing weather icon: {e}", exc_info=True)
             else:
-                logging.warning(f"Weather icon not found: {icon_path}")
+                logging.warning(f"Weather icon not found in cache: {condition}")
 
             # Get BDF fonts
             font_large = self.fonts.get(3, self.fonts[2])  # Size 3 for temperature
@@ -497,21 +543,13 @@ class DisplayManager:
 
             # ===== PAGE 1: Temperature, Feels Like, Wind, Cloud Cover, Pressure =====
             if page == 0:
-                # Try to load and draw weather icon (top-right)
-                icon_path = self._get_weather_icon_path(condition, weather_data.get('is_night', False))
-                logging.debug(f"Weather on 8s icon path: {icon_path}")
+                # Get cached weather icon (24x24) for "Weather on 8s"
+                is_night = weather_data.get('is_night', False)
+                icon = self._get_cached_icon(condition, is_night, size=24)
 
-                if icon_path and icon_path.exists():
+                if icon:
                     try:
-                        logging.debug(f"Loading Weather on 8s icon: {icon_path}")
-                        icon = Image.open(icon_path)
-                        if icon.size != (24, 24):
-                            icon = icon.resize((24, 24))
-                        if icon.mode != 'RGB':
-                            icon = icon.convert('RGB')
-
-                        is_night = weather_data.get('is_night', False)
-                        brightness_multiplier = 0.5 if is_night else 2.0
+                        brightness_multiplier = self._get_icon_brightness_multiplier(is_night, mode='weather')
 
                         for y in range(min(24, self.config.display_height)):
                             for x in range(24):
@@ -522,11 +560,11 @@ class DisplayManager:
                                         g = min(255, int(g * brightness_multiplier))
                                         b = min(255, int(b * brightness_multiplier))
                                         self.canvas.SetPixel(x + 40, y, r, g, b)
-                        logging.debug("Weather on 8s icon drawn successfully")
+                        logging.debug("Weather on 8s icon drawn from cache")
                     except Exception as e:
-                        logging.error(f"Error loading Weather on 8s icon: {e}", exc_info=True)
+                        logging.error(f"Error drawing Weather on 8s icon: {e}", exc_info=True)
                 else:
-                    logging.warning(f"Weather on 8s icon not found: {icon_path}")
+                    logging.warning(f"Weather on 8s icon not found in cache: {condition}")
 
                 # Row 0-9: Temperature (large, left side)
                 temp = weather_data.get('temp', 0)
@@ -886,25 +924,16 @@ class DisplayManager:
             # Center the icon+temp group within the 32px panel
             start_x = x_offset + (w - total_width) // 2
 
-            # Load and render icon
-            icon_path = self._get_weather_icon_path(condition, is_night)
-            logging.debug(f"Daily forecast icon: condition={condition}, is_night={is_night}, path={icon_path}")
-            if icon_path and icon_path.exists():
+            # Get cached icon (20x20 for daily forecast)
+            icon = self._get_cached_icon(condition, is_night, size=20)
+            if icon:
                 try:
-                    logging.debug(f"Loading daily forecast icon: {icon_path}")
-                    icon = Image.open(icon_path)
-                    # Resize to 20x20 for daily forecast
-                    if icon.size != (20, 20):
-                        icon = icon.resize((20, 20))
-                    if icon.mode != 'RGB':
-                        icon = icon.convert('RGB')
-
                     # Position icon at start of centered group
                     icon_x = start_x
                     icon_y = 4  # Move up 4px from previous position
 
                     # Brightness: 0.125x at night, 1.0x during day (87.5% dimmer)
-                    brightness_multiplier = 0.125 if self.config._is_night else 1.0
+                    brightness_multiplier = self._get_icon_brightness_multiplier(self.config._is_night, mode='forecast')
                     logging.debug(f"Daily forecast brightness: night_mode={self.config._is_night}, multiplier={brightness_multiplier}")
 
                     for y in range(20):
@@ -916,7 +945,7 @@ class DisplayManager:
                                 b = min(255, int(b * brightness_multiplier))
                                 self.canvas.SetPixel(icon_x + x, icon_y + y, r, g, b)
                 except Exception as e:
-                    logging.error(f"Error loading icon for {condition}: {e}")
+                    logging.error(f"Error drawing daily forecast icon: {e}")
 
             # Render temperature next to icon, vertically centered with icon
             temp_x = start_x + icon_width + gap
@@ -968,8 +997,64 @@ class DisplayManager:
             fade_b = int(color_rgb[2] * fractional)
             self.canvas.SetPixel(bar_width, 31, fade_r, fade_g, fade_b)
 
+    @lru_cache(maxsize=4)
+    def _get_icon_brightness_multiplier(self, is_night: bool, mode: str = 'weather') -> float:
+        """
+        Get brightness multiplier for icons (cached for performance).
+
+        Args:
+            is_night: Whether it's night mode
+            mode: 'weather' for current weather, 'forecast' for daily forecast
+
+        Returns:
+            Brightness multiplier (0.125-2.0)
+        """
+        if mode == 'weather':
+            # Weather display: 2x day, 0.5x night to match text palette
+            return 0.5 if is_night else 2.0
+        elif mode == 'forecast':
+            # Daily forecast: 1.0x day, 0.125x night (87.5% dimmer)
+            return 0.125 if is_night else 1.0
+        else:
+            return 1.0
+
+    def _get_cached_icon(self, condition: str, is_night: bool, size: int = 24) -> Optional[Image.Image]:
+        """
+        Get weather icon from memory cache.
+
+        Args:
+            condition: Weather condition string (e.g., "Clear", "Rain")
+            is_night: Whether it's nighttime
+            size: Icon size (24 or 20)
+
+        Returns:
+            PIL Image object from cache, or None if not found
+        """
+        # Get the icon filename using existing mapping logic
+        icon_path = self._get_weather_icon_path(condition, is_night)
+        if not icon_path:
+            return None
+
+        # Build cache key
+        cache_key = f"{icon_path.stem}_{size}"
+
+        # Return from cache
+        icon = self._icon_cache.get(cache_key)
+        if icon:
+            logging.debug(f"Icon cache hit: {cache_key}")
+        else:
+            logging.debug(f"Icon cache miss: {cache_key}")
+
+        return icon
+
+    @lru_cache(maxsize=128)
     def _get_weather_icon_path(self, condition: str, is_night: bool) -> Optional[Path]:
-        """Get path to weather icon file using Tomorrow.io naming convention"""
+        """
+        Get path to weather icon file using Tomorrow.io naming convention.
+
+        Cached to avoid repeated string processing and path lookups.
+        With ~70 total weather conditions, 128 cache entries is plenty.
+        """
         icon_dir = Path(__file__).parent.parent / "icons"
 
         if not icon_dir.exists():
