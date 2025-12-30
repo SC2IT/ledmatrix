@@ -886,10 +886,11 @@ class DisplayManager:
 
                     # Position icon at start of centered group
                     icon_x = start_x
-                    icon_y = 8  # Vertically centered in rows 6-29 (24px available, icon 20px = 2px margin top)
+                    icon_y = 4  # Move up 4px from previous position
 
                     # Brightness: 0.75x at night, 1.0x during day
                     brightness_multiplier = 0.75 if self.config._is_night else 1.0
+                    logging.debug(f"Daily forecast brightness: night_mode={self.config._is_night}, multiplier={brightness_multiplier}")
 
                     for y in range(20):
                         for x in range(20):
@@ -920,13 +921,15 @@ class DisplayManager:
             graphics.DrawText(self.canvas, font_tiny, info_x, 30, white_color, info_text)
 
     def _render_progress_bar(self, elapsed_seconds: float):
-        """Render animated progress bar on row 31"""
+        """Render animated progress bar on row 31 with smooth gradient"""
         palette = self.config.get_palette()
         flip_interval = self.config.forecast_flip_interval
         progress = min(1.0, elapsed_seconds / flip_interval)
 
-        # Calculate bar width (will reach full 64 pixels at 100%)
-        bar_width = int(progress * self.config.display_width)
+        # Calculate bar width with sub-pixel precision
+        bar_width_float = progress * self.config.display_width
+        bar_width = int(bar_width_float)
+        fractional = bar_width_float - bar_width
 
         # Color gradient from palette: cyan -> yellow -> orange -> red
         if progress < 0.5:
@@ -938,11 +941,17 @@ class DisplayManager:
         else:
             color_rgb = palette.get(2, (255, 0, 0))  # Red (warning: about to flip)
 
-        color = graphics.Color(color_rgb[0], color_rgb[1], color_rgb[2])
-
         # Draw filled portion of progress bar
         for x in range(bar_width):
-            self.canvas.SetPixel(x, 31, color.red, color.green, color.blue)
+            self.canvas.SetPixel(x, 31, color_rgb[0], color_rgb[1], color_rgb[2])
+
+        # Add smooth gradient at leading edge (anti-aliasing)
+        if bar_width < self.config.display_width and fractional > 0:
+            # Fade-in effect for the next pixel
+            fade_r = int(color_rgb[0] * fractional)
+            fade_g = int(color_rgb[1] * fractional)
+            fade_b = int(color_rgb[2] * fractional)
+            self.canvas.SetPixel(bar_width, 31, fade_r, fade_g, fade_b)
 
     def _get_weather_icon_path(self, condition: str, is_night: bool) -> Optional[Path]:
         """Get path to weather icon file using Tomorrow.io naming convention"""
