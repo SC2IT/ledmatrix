@@ -7,6 +7,7 @@ import yaml
 import logging
 from datetime import datetime, time as dt_time
 from pathlib import Path
+from functools import cached_property
 
 try:
     from astral import LocationInfo
@@ -142,73 +143,74 @@ class Config:
             logging.error(f"Error checking night time: {e}")
             return False
 
-    # Convenience accessors
-    @property
+    # Convenience accessors (cached to avoid repeated dict lookups)
+    # Config is loaded once at startup and never changes, so caching is safe
+    @cached_property
     def aio_username(self):
         return self.data['aio']['username']
 
-    @property
+    @cached_property
     def aio_key(self):
         return self.data['aio']['key']
 
-    @property
+    @cached_property
     def aio_feed(self):
         return self.data['aio'].get('feed', 'matrixmessage')
 
-    @property
+    @cached_property
     def weather_location_id(self):
         return self.data['aio'].get('weather_location_id', 2815)
 
-    @property
+    @cached_property
     def mqtt_enabled(self):
         return self.data['aio'].get('mqtt', {}).get('enabled', True)
 
-    @property
+    @cached_property
     def rest_enabled(self):
         return self.data['aio'].get('rest', {}).get('enabled', True)
 
-    @property
+    @cached_property
     def rest_poll_interval(self):
         return self.data['aio'].get('rest', {}).get('poll_interval', 10)
 
-    @property
+    @cached_property
     def display_width(self):
         return self.data['display'].get('width', 64)
 
-    @property
+    @cached_property
     def display_height(self):
         return self.data['display'].get('height', 32)
 
-    @property
+    @cached_property
     def gpio_slowdown(self):
         return self.data['display'].get('gpio_slowdown', 4)
 
-    @property
+    @cached_property
     def pwm_bits(self):
         return self.data['display'].get('pwm_bits', 11)
 
-    @property
+    @cached_property
     def brightness(self):
         return self.data['display'].get('brightness', 100)
 
-    @property
+    @cached_property
     def hardware_mapping(self):
         return self.data['display'].get('hardware_mapping', 'adafruit-hat-pwm')
 
-    @property
+    @cached_property
     def hardware_pulse(self):
         """Enable hardware pulse generation (disables sound compatibility)"""
         return self.data['display'].get('hardware_pulse', True)
 
-    @property
+    @cached_property
     def rtc_enabled(self):
         return self.data.get('rtc', {}).get('enabled', True)
 
-    @property
+    @cached_property
     def logging_level(self):
         return self.data.get('logging', {}).get('level', 'INFO')
 
-    @property
+    @cached_property
     def forecast_flip_interval(self):
         """Forecast carousel flip interval in seconds"""
         return self.data.get('forecast', {}).get('flip_interval', 10)
