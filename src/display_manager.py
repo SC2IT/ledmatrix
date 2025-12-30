@@ -852,25 +852,44 @@ class DisplayManager:
             label_x = x_offset + (w - label_w) // 2
             graphics.DrawText(self.canvas, font_tiny, label_x, 0 + self.font_ascents.get(1, 5), label_color, panel['label'])
 
-            # Row 6-29: Weather icon (20x20, centered for daily forecast)
+            # Row 6-29: Weather icon and temperature (side-by-side, centered in panel)
+            # Prepare temperature text and color
+            temp_idx = self._get_temp_color_index(display_temp)
+            temp_rgb = palette.get(temp_idx, (255, 255, 255))
+            temp_color = graphics.Color(temp_rgb[0], temp_rgb[1], temp_rgb[2])
+            temp_text = str(display_temp)
+
+            # Measure temperature text width (using font_small - one size larger)
+            temp_w = graphics.DrawText(self.canvas, font_small, -1000, 0, temp_color, temp_text)
+
+            # Calculate layout: icon (20px) + gap (2px) + temp text
+            icon_width = 20
+            icon_height = 20
+            gap = 2
+            total_width = icon_width + gap + temp_w
+
+            # Center the icon+temp group within the 32px panel
+            start_x = x_offset + (w - total_width) // 2
+
+            # Load and render icon
             icon_path = self._get_weather_icon_path(condition, is_night)
             logging.debug(f"Daily forecast icon: condition={condition}, is_night={is_night}, path={icon_path}")
             if icon_path and icon_path.exists():
                 try:
                     logging.info(f"Loading daily forecast icon: {icon_path}")
                     icon = Image.open(icon_path)
-                    # Resize to 20x20 for daily forecast (smaller than weather display)
+                    # Resize to 20x20 for daily forecast
                     if icon.size != (20, 20):
                         icon = icon.resize((20, 20))
                     if icon.mode != 'RGB':
                         icon = icon.convert('RGB')
 
-                    # Center icon horizontally in panel (32px wide, icon 20px = 6px margin on each side)
-                    icon_x = x_offset + 6
-                    icon_y = 6
+                    # Position icon at start of centered group
+                    icon_x = start_x
+                    icon_y = 8  # Vertically centered in rows 6-29 (24px available, icon 20px = 2px margin top)
 
-                    # Dim icons when system is in night mode, full brightness during day
-                    brightness_multiplier = 0.5 if self.config._is_night else 1.0
+                    # Brightness: 0.75x at night, 1.0x during day
+                    brightness_multiplier = 0.75 if self.config._is_night else 1.0
 
                     for y in range(20):
                         for x in range(20):
@@ -883,16 +902,10 @@ class DisplayManager:
                 except Exception as e:
                     logging.error(f"Error loading icon for {condition}: {e}")
 
-            # Temperature display (shows high or low based on time of day)
-            # TODAY: high before 1hr of sunset, low after
-            # TOMORROW: always high
-            temp_idx = self._get_temp_color_index(display_temp)
-            temp_rgb = palette.get(temp_idx, (255, 255, 255))
-            temp_color = graphics.Color(temp_rgb[0], temp_rgb[1], temp_rgb[2])
-
-            # Center the temperature vertically in the available space
-            temp_y = 16  # Middle position between 12 and 20
-            graphics.DrawText(self.canvas, font_tiny, x_offset + 28, temp_y, temp_color, str(display_temp))
+            # Render temperature next to icon, vertically centered with icon
+            temp_x = start_x + icon_width + gap
+            temp_y = icon_y + (icon_height // 2) + (self.font_ascents.get(2, 7) // 2)
+            graphics.DrawText(self.canvas, font_small, temp_x, temp_y, temp_color, temp_text)
 
             # Row 30-31: Condition + precipitation (centered)
             abbrev = self._abbreviate_condition(condition)
