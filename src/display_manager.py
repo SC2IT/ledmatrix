@@ -791,7 +791,7 @@ class DisplayManager:
             temp_min = panel['data'].get('temp_min', 0)
             condition = panel['data'].get('condition', 'Clear')
             precip = panel['data'].get('precip_chance', 0)
-            is_night = panel['data'].get('is_night', self.config._is_night)
+            is_night = self.config._is_night  # Use current day/night mode
 
             # Row 0-5: Day label (centered)
             label_rgb = palette.get(1, (255, 255, 255))
@@ -802,8 +802,10 @@ class DisplayManager:
 
             # Row 6-29: Weather icon (24x24, centered)
             icon_path = self._get_weather_icon_path(condition, is_night)
+            logging.debug(f"Daily forecast icon: condition={condition}, is_night={is_night}, path={icon_path}")
             if icon_path and icon_path.exists():
                 try:
+                    logging.info(f"Loading daily forecast icon: {icon_path}")
                     icon = Image.open(icon_path)
                     if icon.size != (24, 24):
                         icon = icon.resize((24, 24))
