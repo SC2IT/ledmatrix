@@ -4,6 +4,7 @@ Uses hzeller/rpi-rgb-led-matrix library
 """
 
 import logging
+import time
 from typing import Optional, List, Tuple
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
