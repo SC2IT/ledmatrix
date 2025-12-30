@@ -370,8 +370,11 @@ class LEDMatrixApp:
 
                         # Check if time to flip (after displaying full bar)
                         if self.forecast_flip_timer >= self.config.forecast_flip_interval:
+                            logging.info(f"Flipping forecast view (timer={self.forecast_flip_timer:.1f}s >= interval={self.config.forecast_flip_interval}s)")
                             self.display.flip_carousel_view()
                             self.forecast_flip_timer = 0.0
+                        else:
+                            logging.debug(f"Forecast timer: {self.forecast_flip_timer:.1f}s / {self.config.forecast_flip_interval}s")
 
                 # Update day/night mode based on time
                 if self.config.data.get('schedule', {}).get('enable_auto_dimming', True):
