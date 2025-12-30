@@ -9,6 +9,7 @@ import signal
 import sys
 import time
 from pathlib import Path
+from enum import Enum, auto
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -19,6 +20,17 @@ from src.text_renderer import TextParser
 from src.aio_client import AIOClient
 from src.owm_client import OWMClient
 from src.rtc_sync import RTCSync
+
+
+class DisplayMode(Enum):
+    """App display modes - replaces multiple boolean flags with clear state machine"""
+    IDLE = auto()  # Nothing displayed or cleared
+    TEXT = auto()  # Custom formatted text
+    WEATHER = auto()  # Current weather (static)
+    FORECAST_HOURLY = auto()  # Hourly forecast carousel
+    FORECAST_DAILY = auto()  # Daily forecast carousel
+    WEATHER_ON_8S = auto()  # "Weather on the 8s" special display
+    PRESET = auto()  # Preset layout (ON-CALL, FREE, BUSY, etc.)
 
 
 class LEDMatrixApp:

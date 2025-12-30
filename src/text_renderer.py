@@ -12,13 +12,24 @@ class TextParser:
 
     MAX_LINES = 3  # Maximum lines for 32px display
 
+    # Regex pattern for format: {color}<size>text
+    # Captures: (color_number, size_number, text_content)
+    PATTERN = re.compile(r'^\{(\d+)\}<(\d+)>(.+)$')
+
     @staticmethod
     def parse(text: str) -> List[Tuple[int, int, str]]:
         """
-        Parse Stream Deck format text into structured data
+        Parse Stream Deck format text into structured data using regex.
 
         Format: {color}<size>text
+        Example: {2}<3>URGENT MESSAGE
+
         Returns: List of (color_index, font_size, text) tuples
+
+        Improvements over manual parsing:
+        - Cleaner code with regex pattern matching
+        - More Pythonic and easier to maintain
+        - Full Python regex engine vs CircuitPython's limited string methods
         """
         if not text or not text.strip():
             return []
@@ -31,38 +42,27 @@ class TextParser:
             if not line:
                 continue
 
-            # Check for format: {color}<size>text
-            if line.startswith('{') and '}<' in line and '>' in line:
+            # Try to match format pattern
+            match = TextParser.PATTERN.match(line)
+
+            if match:
                 try:
-                    # Find positions
-                    color_end = line.find('}')
-                    size_start = line.find('<', color_end) + 1
-                    size_end = line.find('>', size_start)
+                    # Extract groups from regex match
+                    color_index = int(match.group(1))
+                    font_size = int(match.group(2))
+                    text_part = match.group(3)
 
-                    if color_end > 1 and size_start > color_end and size_end > size_start:
-                        # Extract parts
-                        color_str = line[1:color_end]
-                        size_str = line[size_start:size_end]
-                        text_part = line[size_end + 1:]
+                    # Validate ranges
+                    color_index = max(0, min(27, color_index))  # 0-27 palette
+                    font_size = max(1, min(7, font_size))  # 1-7 font sizes
 
-                        # Convert to integers
-                        color_index = int(color_str)
-                        font_size = int(size_str)
-
-                        # Validate ranges
-                        color_index = max(0, min(27, color_index))  # 0-27 palette
-                        font_size = max(1, min(7, font_size))  # 1-7 font sizes
-
-                        parsed.append((color_index, font_size, text_part))
-                    else:
-                        # Malformed, use defaults
-                        parsed.append((1, 2, line))  # White, medium
+                    parsed.append((color_index, font_size, text_part))
 
                 except (ValueError, IndexError):
                     # Parse error, use defaults
                     parsed.append((1, 2, line))  # White, medium
             else:
-                # Plain text, use defaults
+                # No match, treat as plain text with defaults
                 parsed.append((1, 2, line))  # White, medium
 
         return parsed
