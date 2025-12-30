@@ -911,7 +911,10 @@ class DisplayManager:
         icon_dir = Path(__file__).parent.parent / "icons"
 
         if not icon_dir.exists():
+            logging.warning(f"Icons directory not found: {icon_dir}")
             return None
+
+        logging.debug(f"Looking for icon: condition='{condition}', is_night={is_night}, icon_dir={icon_dir}")
 
         # Map Apple WeatherKit condition codes to Tomorrow.io icon codes
         # Format: {code}{night_flag}_{description}_small.bmp
@@ -943,19 +946,24 @@ class DisplayManager:
         }
 
         icon_base = icon_map.get(condition, "1000_clear_sunny")
+        logging.debug(f"Icon mapping: '{condition}' -> '{icon_base}'")
 
         # Add night suffix if nighttime (1 gets appended to code)
         if is_night:
             # Insert '1' before the underscore (e.g., "1000" -> "10001")
             parts = icon_base.split('_', 1)
             icon_base = f"{parts[0]}1_{parts[1]}"
+            logging.debug(f"Night mode: icon_base adjusted to '{icon_base}'")
 
         # Icons are BMP files with _small suffix
         icon_path = icon_dir / f"{icon_base}_small.bmp"
+        logging.debug(f"Looking for icon file: {icon_path}")
 
         if icon_path.exists():
+            logging.debug(f"Icon file found: {icon_path}")
             return icon_path
 
+        logging.warning(f"Icon file not found: {icon_path}")
         return None
 
     def _show_image(self, img: Image.Image):
