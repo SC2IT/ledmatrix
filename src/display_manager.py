@@ -890,7 +890,7 @@ class DisplayManager:
 
                     # Brightness: 0.75x at night, 1.0x during day
                     brightness_multiplier = 0.75 if self.config._is_night else 1.0
-                    logging.debug(f"Daily forecast brightness: night_mode={self.config._is_night}, multiplier={brightness_multiplier}")
+                    logging.info(f"Daily forecast brightness: night_mode={self.config._is_night}, multiplier={brightness_multiplier}")
 
                     for y in range(20):
                         for x in range(20):
