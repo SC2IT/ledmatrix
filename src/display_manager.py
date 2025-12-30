@@ -869,8 +869,8 @@ class DisplayManager:
                     icon_x = x_offset + 6
                     icon_y = 6
 
-                    # Reduce brightness to match night palette (0.5x for both day and night)
-                    brightness_multiplier = 0.5
+                    # Dim icons when system is in night mode, full brightness during day
+                    brightness_multiplier = 0.5 if self.config._is_night else 1.0
 
                     for y in range(20):
                         for x in range(20):
