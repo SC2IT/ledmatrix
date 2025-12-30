@@ -182,34 +182,23 @@ class OWMClient:
             self.stop_event.wait(timeout=10)
 
     def _fetch_weather(self):
-        """Fetch weather data from OpenWeatherMap API"""
+        """Fetch weather data from OpenWeatherMap One Call API 3.0"""
         try:
-            # Fetch current weather
-            current_url = (
-                f"https://api.openweathermap.org/data/2.5/weather?"
+            # Fetch all data with One Call API 3.0 (1 call instead of 2)
+            onecall_url = (
+                f"https://api.openweathermap.org/data/3.0/onecall?"
                 f"lat={self.lat}&lon={self.lon}&appid={self.api_key}&units=imperial"
             )
 
-            logging.debug(f"Fetching current weather from OWM")
-            current_response = requests.get(current_url, timeout=10)
-            current_response.raise_for_status()
-            current_data = current_response.json()
-
-            # Fetch 5-day forecast (3-hour intervals)
-            forecast_url = (
-                f"https://api.openweathermap.org/data/2.5/forecast?"
-                f"lat={self.lat}&lon={self.lon}&appid={self.api_key}&units=imperial"
-            )
-
-            logging.debug(f"Fetching forecast from OWM")
-            forecast_response = requests.get(forecast_url, timeout=10)
-            forecast_response.raise_for_status()
-            forecast_data = forecast_response.json()
+            logging.debug(f"Fetching weather from OWM One Call API 3.0")
+            response = requests.get(onecall_url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
 
             # Process data
             with self.data_lock:
-                self._process_current_weather(current_data)
-                self._process_forecast(forecast_data)
+                self._process_current_weather(data.get('current', {}), data.get('timezone_offset', 0))
+                self._process_forecast(data.get('hourly', []), data.get('daily', []))
                 self.last_update = time.time()
 
             logging.info(f"Weather updated from OWM: {self.weather_data.get('temp')}°F, {self.weather_data.get('condition')}")
@@ -223,24 +212,28 @@ class OWMClient:
         except Exception as e:
             logging.error(f"Error fetching weather from OWM: {e}", exc_info=True)
 
-    def _process_current_weather(self, data: dict):
-        """Process current weather data from OWM"""
+    def _process_current_weather(self, data: dict, timezone_offset: int = 0):
+        """Process current weather data from OWM One Call API 3.0"""
         try:
-            main = data.get('main', {})
+            # One Call API 3.0 has flatter structure (no 'main' nesting)
             weather = data.get('weather', [{}])[0]
-            wind = data.get('wind', {})
-            sys_data = data.get('sys', {})
 
-            # Extract values
-            temp_f = round(main.get('temp', 0))
-            feels_f = round(main.get('feels_like', temp_f))
-            humidity = round(main.get('humidity', 0))
-            pressure_hpa = main.get('pressure', 1013.25)
+            # Extract values (imperial units already applied)
+            temp_f = round(data.get('temp', 0))
+            feels_f = round(data.get('feels_like', temp_f))
+            humidity = round(data.get('humidity', 0))
+            pressure_hpa = data.get('pressure', 1013.25)
             pressure_inhg = round(pressure_hpa * 0.02953, 2)
 
-            wind_speed_ms = wind.get('speed', 0)
-            wind_mph = round(wind_speed_ms * 2.237)
-            wind_deg = wind.get('deg', 0)
+            wind_speed_mph = round(data.get('wind_speed', 0))  # Already in MPH with imperial units
+            wind_deg = data.get('wind_deg', 0)
+            wind_gust_mph = round(data.get('wind_gust', 0))  # NEW in One Call API
+
+            # NEW fields in One Call API 3.0
+            uvi = round(data.get('uvi', 0), 1)  # UV Index
+            dew_point_f = round(data.get('dew_point', 0))
+            clouds = data.get('clouds', 0)  # Cloud coverage %
+            visibility = data.get('visibility', 10000)  # meters
 
             # Map OpenWeatherMap condition codes to display icon format
             owm_condition = weather.get('main', 'Clear')
@@ -251,9 +244,9 @@ class OWMClient:
             dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
             wind_dir_str = dirs[round(wind_deg / 45) % 8]
 
-            # Determine day/night from sunrise/sunset
-            sunrise = sys_data.get('sunrise', 0)
-            sunset = sys_data.get('sunset', 0)
+            # Determine day/night from sunrise/sunset (in current object for One Call API)
+            sunrise = data.get('sunrise', 0)
+            sunset = data.get('sunset', 0)
             now = time.time()
             is_night = now < sunrise or now > sunset
 
@@ -273,11 +266,11 @@ class OWMClient:
                 return 8  # Orange
 
             # Precipitation (from rain/snow data if available)
-            rain_1h = data.get('rain', {}).get('1h', 0)
-            snow_1h = data.get('snow', {}).get('1h', 0)
+            rain_1h = data.get('rain', {}).get('1h', 0) if isinstance(data.get('rain'), dict) else 0
+            snow_1h = data.get('snow', {}).get('1h', 0) if isinstance(data.get('snow'), dict) else 0
             precip_chance = 0
             if rain_1h > 0 or snow_1h > 0:
-                precip_chance = 100  # OWM doesn't provide % chance, only actual precip
+                precip_chance = 100  # Current conditions don't have pop, only actual precip
 
             # Store weather data
             self.weather_data = {
@@ -285,14 +278,19 @@ class OWMClient:
                 'temp_color': get_temp_color(temp_f),
                 'feels_like': feels_f,
                 'feels_like_color': get_temp_color(feels_f),
-                'wind_speed': wind_mph,
+                'wind_speed': wind_speed_mph,
+                'wind_gust': wind_gust_mph,  # NEW
                 'wind_dir': wind_dir_str,
                 'humidity': humidity,
                 'pressure': pressure_inhg,
                 'pressure_trend': 'steady',  # OWM doesn't provide trend
                 'is_night': is_night,
                 'condition': condition,
-                'precip_chance': precip_chance
+                'precip_chance': precip_chance,
+                'uvi': uvi,  # NEW
+                'dew_point': dew_point_f,  # NEW
+                'clouds': clouds,  # NEW
+                'visibility': visibility  # NEW
             }
 
             # Update day/night mode
@@ -305,77 +303,76 @@ class OWMClient:
         except Exception as e:
             logging.error(f"Error processing current weather: {e}", exc_info=True)
 
-    def _process_forecast(self, data: dict):
-        """Process forecast data from OWM (5-day, 3-hour intervals)"""
+    def _process_forecast(self, hourly_list: list, daily_list: list):
+        """Process forecast data from OWM One Call API 3.0"""
         try:
-            forecast_list = data.get('list', [])
+            # Process hourly forecasts (48 hours available, use +6h and +12h)
+            if hourly_list and len(hourly_list) >= 12:
+                for hours in [6, 12]:
+                    if hours < len(hourly_list):
+                        hour_data = hourly_list[hours]
+                        weather = hour_data.get('weather', [{}])[0]
 
-            if not forecast_list:
-                return
+                        temp_f = round(hour_data.get('temp', 0))
+                        owm_condition = weather.get('main', 'Clear')
+                        condition_id = weather.get('id', 800)
+                        condition = self._map_owm_condition(owm_condition, condition_id)
+                        precip_prob = hour_data.get('pop', 0) * 100  # Probability of precipitation
 
-            # Extract hourly forecasts (closest to +6h and +12h)
-            now = time.time()
-            target_times = {
-                6: now + (6 * 3600),
-                12: now + (12 * 3600)
-            }
+                        self.forecast_hourly[hours] = {
+                            'temp': temp_f,
+                            'condition': condition,
+                            'time': datetime.fromtimestamp(hour_data['dt']).strftime('%H:%M'),
+                            'precip_chance': round(precip_prob),
+                            'wind_speed': round(hour_data.get('wind_speed', 0)),
+                            'wind_gust': round(hour_data.get('wind_gust', 0)),
+                            'humidity': round(hour_data.get('humidity', 0)),
+                            'uvi': round(hour_data.get('uvi', 0), 1)
+                        }
 
-            for hours, target_time in target_times.items():
-                # Find closest forecast to target time
-                closest = min(forecast_list, key=lambda x: abs(x['dt'] - target_time))
+            # Process daily forecasts (8 days available, use days 0-2)
+            if daily_list:
+                for day_offset in range(min(3, len(daily_list))):
+                    day_data = daily_list[day_offset]
+                    weather = day_data.get('weather', [{}])[0]
+                    temp_obj = day_data.get('temp', {})
 
-                main = closest.get('main', {})
-                weather = closest.get('weather', [{}])[0]
+                    # Map condition
+                    owm_condition = weather.get('main', 'Clear')
+                    condition_id = weather.get('id', 800)
+                    condition = self._map_owm_condition(owm_condition, condition_id)
 
-                temp_f = round(main.get('temp', 0))
-                owm_condition = weather.get('main', 'Clear')
-                condition_id = weather.get('id', 800)
-                condition = self._map_owm_condition(owm_condition, condition_id)
-                precip_prob = closest.get('pop', 0) * 100  # Probability of precipitation
+                    # Extract temperatures (One Call API provides detailed temp breakdown)
+                    temp_max = round(temp_obj.get('max', 0))
+                    temp_min = round(temp_obj.get('min', 0))
+                    temp_day = round(temp_obj.get('day', 0))
+                    temp_night = round(temp_obj.get('night', 0))
+                    temp_eve = round(temp_obj.get('eve', 0))
+                    temp_morn = round(temp_obj.get('morn', 0))
 
-                self.forecast_hourly[hours] = {
-                    'temp': temp_f,
-                    'condition': condition,
-                    'time': datetime.fromtimestamp(closest['dt']).strftime('%H:%M'),
-                    'precip_chance': round(precip_prob)
-                }
+                    # Precipitation probability
+                    precip_prob = day_data.get('pop', 0) * 100
 
-            # Extract daily forecasts (today + next 2 days)
-            # Group by day and calculate high/low
-            from collections import defaultdict
-            daily_temps = defaultdict(lambda: {'temps': [], 'conditions': [], 'precip': []})
+                    # Summary (One Call API provides this!)
+                    summary = day_data.get('summary', '')
 
-            for item in forecast_list:
-                dt = datetime.fromtimestamp(item['dt'])
-                day_offset = (dt.date() - datetime.now().date()).days
-
-                if 0 <= day_offset <= 2:  # Today, tomorrow, and day after
-                    daily_temps[day_offset]['temps'].append(item['main']['temp'])
-                    # Store mapped condition
-                    owm_cond = item['weather'][0]['main']
-                    cond_id = item['weather'][0]['id']
-                    mapped_cond = self._map_owm_condition(owm_cond, cond_id)
-                    daily_temps[day_offset]['conditions'].append(mapped_cond)
-                    daily_temps[day_offset]['precip'].append(item.get('pop', 0) * 100)
-
-            # Calculate daily summary
-            for day, data_dict in daily_temps.items():
-                if data_dict['temps']:
-                    # Most common mapped condition
-                    if data_dict['conditions']:
-                        most_common_condition = max(set(data_dict['conditions']), key=data_dict['conditions'].count)
-                    else:
-                        most_common_condition = 'Clear'
-                        logging.warning(f"No conditions found for day {day}, defaulting to Clear")
-
-                    logging.debug(f"Day {day} forecast: temps={data_dict['temps'][:3]}..., conditions={data_dict['conditions'][:3]}..., most_common={most_common_condition}")
-
-                    self.forecast_daily[day] = {
-                        'temp_max': round(max(data_dict['temps'])),
-                        'temp_min': round(min(data_dict['temps'])),
-                        'condition': most_common_condition,
-                        'date': '',
-                        'precip_chance': round(max(data_dict['precip']))  # Max chance during day
+                    self.forecast_daily[day_offset] = {
+                        'temp_max': temp_max,
+                        'temp_min': temp_min,
+                        'temp_day': temp_day,  # NEW
+                        'temp_night': temp_night,  # NEW
+                        'temp_eve': temp_eve,  # NEW
+                        'temp_morn': temp_morn,  # NEW
+                        'condition': condition,
+                        'date': datetime.fromtimestamp(day_data['dt']).strftime('%a %m/%d'),
+                        'precip_chance': round(precip_prob),
+                        'summary': summary,  # NEW
+                        'humidity': round(day_data.get('humidity', 0)),
+                        'wind_speed': round(day_data.get('wind_speed', 0)),
+                        'wind_gust': round(day_data.get('wind_gust', 0)),
+                        'uvi': round(day_data.get('uvi', 0), 1),
+                        'sunrise': day_data.get('sunrise', 0),
+                        'sunset': day_data.get('sunset', 0)
                     }
 
             logging.debug(f"Forecast processed: hourly={list(self.forecast_hourly.keys())}, daily={list(self.forecast_daily.keys())}")

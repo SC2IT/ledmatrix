@@ -463,6 +463,7 @@ class DisplayManager:
     def show_weather_with_progress(self, weather_data: dict, condition: str, elapsed_seconds: float, duration: float):
         """
         Display weather information with progress bar (for 'Weather on the 8s')
+        Two pages: Page 1 (0-15s) and Page 2 (15-30s)
 
         Args:
             weather_data: Dictionary with weather values
@@ -482,140 +483,160 @@ class DisplayManager:
 
             # Clear canvas
             self.canvas.Clear()
-            logging.debug(f"Rendering weather with progress: condition={condition}, elapsed={elapsed_seconds:.1f}s")
 
-            # Try to load and draw weather icon
-            icon_path = self._get_weather_icon_path(condition, weather_data.get('is_night', False))
-
-            if icon_path and icon_path.exists():
-                try:
-                    icon = Image.open(icon_path)
-                    # Resize if needed (assuming icons are 24x24)
-                    if icon.size != (24, 24):
-                        icon = icon.resize((24, 24))
-
-                    # Convert to RGB if needed
-                    if icon.mode != 'RGB':
-                        icon = icon.convert('RGB')
-
-                    # Draw icon pixel by pixel at top-right (x=40, y=0)
-                    is_night = weather_data.get('is_night', False)
-                    brightness_multiplier = 0.5 if is_night else 2.0
-
-                    for y in range(min(24, self.config.display_height)):
-                        for x in range(24):
-                            if x + 40 < self.config.display_width:
-                                r, g, b = icon.getpixel((x, y))
-                                # Only draw non-black pixels (transparent background)
-                                if r > 0 or g > 0 or b > 0:
-                                    # Adjust brightness to match text
-                                    r = min(255, int(r * brightness_multiplier))
-                                    g = min(255, int(g * brightness_multiplier))
-                                    b = min(255, int(b * brightness_multiplier))
-                                    self.canvas.SetPixel(x + 40, y, r, g, b)
-                except Exception as e:
-                    logging.error(f"Error loading weather icon: {e}", exc_info=True)
+            # Determine which page to show (flip at 15 seconds)
+            page = 0 if elapsed_seconds < (duration / 2) else 1
+            logging.debug(f"Rendering weather page {page+1}/2: condition={condition}, elapsed={elapsed_seconds:.1f}s")
 
             # Get BDF fonts
-            font_large = self.fonts.get(3, self.fonts[2])  # Size 3 for temperature
-            font_small = self.fonts.get(1, self.fonts[2])  # Size 1 for details
+            font_large = self.fonts.get(3, self.fonts[2])  # Size 3 for main value
+            font_medium = self.fonts.get(2, self.fonts[2])  # Size 2 for secondary
+            font_small = self.fonts.get(1, self.fonts[2])  # Size 1 for tiny text
 
-            # Temperature (large, left side)
-            temp = weather_data.get('temp', 0)
-            temp_color = palette.get(weather_data.get('temp_color', 1), (255, 255, 255))
-            temp_str = str(temp)
+            # ===== PAGE 1: Temperature, Feels Like, Wind, Cloud Cover, Pressure =====
+            if page == 0:
+                # Try to load and draw weather icon (top-right)
+                icon_path = self._get_weather_icon_path(condition, weather_data.get('is_night', False))
 
-            temp_graphics_color = graphics.Color(temp_color[0], temp_color[1], temp_color[2])
-            baseline_y = 0 + self.font_ascents.get(3, 10)
+                if icon_path and icon_path.exists():
+                    try:
+                        icon = Image.open(icon_path)
+                        if icon.size != (24, 24):
+                            icon = icon.resize((24, 24))
+                        if icon.mode != 'RGB':
+                            icon = icon.convert('RGB')
 
-            # Draw temperature number
-            temp_width = graphics.DrawText(self.canvas, font_large, 1, baseline_y, temp_graphics_color, temp_str)
+                        is_night = weather_data.get('is_night', False)
+                        brightness_multiplier = 0.5 if is_night else 2.0
 
-            # Draw "F" after temperature
-            f_x = 1 + len(temp_str) * 7 + 2
-            graphics.DrawText(self.canvas, font_large, f_x, baseline_y, temp_graphics_color, "F")
+                        for y in range(min(24, self.config.display_height)):
+                            for x in range(24):
+                                if x + 40 < self.config.display_width:
+                                    r, g, b = icon.getpixel((x, y))
+                                    if r > 0 or g > 0 or b > 0:
+                                        r = min(255, int(r * brightness_multiplier))
+                                        g = min(255, int(g * brightness_multiplier))
+                                        b = min(255, int(b * brightness_multiplier))
+                                        self.canvas.SetPixel(x + 40, y, r, g, b)
+                    except Exception as e:
+                        logging.error(f"Error loading weather icon: {e}", exc_info=True)
 
-            # Additional weather info (smaller, bottom)
-            feels = weather_data.get('feels_like', temp)
-            feels_color = palette.get(weather_data.get('feels_like_color', 1), (255, 255, 255))
-            wind_speed = weather_data.get('wind_speed', 0)
-            wind_dir = weather_data.get('wind_dir', 'N')
-            humidity = weather_data.get('humidity', 0)
+                # Row 0-9: Temperature (large, left side)
+                temp = weather_data.get('temp', 0)
+                temp_color = palette.get(weather_data.get('temp_color', 1), (255, 255, 255))
+                temp_graphics_color = graphics.Color(temp_color[0], temp_color[1], temp_color[2])
+                baseline_y = 0 + self.font_ascents.get(3, 10)
 
-            # Line 2: Feels like (y=10)
-            feels_graphics_color = graphics.Color(feels_color[0], feels_color[1], feels_color[2])
-            baseline_y2 = 10 + self.font_ascents.get(2, 7)
-            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y2, feels_graphics_color, f"FL{feels}F")
+                temp_str = str(temp)
+                graphics.DrawText(self.canvas, font_large, 1, baseline_y, temp_graphics_color, temp_str)
+                f_x = 1 + len(temp_str) * 7 + 2
+                graphics.DrawText(self.canvas, font_large, f_x, baseline_y, temp_graphics_color, "F")
 
-            # Line 3: Wind (y=17) - with 2px spacing between components
-            wind_color = palette.get(8, (255, 165, 0))  # Orange
-            wind_graphics_color = graphics.Color(wind_color[0], wind_color[1], wind_color[2])
-            baseline_y3 = 17 + self.font_ascents.get(2, 7)
+                # Row 10-16: Feels like
+                feels = weather_data.get('feels_like', temp)
+                feels_color = palette.get(weather_data.get('feels_like_color', 1), (255, 255, 255))
+                feels_graphics_color = graphics.Color(feels_color[0], feels_color[1], feels_color[2])
+                baseline_y2 = 10 + self.font_ascents.get(2, 7)
+                graphics.DrawText(self.canvas, font_medium, 1, baseline_y2, feels_graphics_color, f"FL{feels}F")
 
-            # Draw wind components separately with 2px spacing
-            current_x = 1
-            # Draw direction
-            dir_width = graphics.DrawText(self.canvas, self.fonts.get(2, font_small), current_x, baseline_y3, wind_graphics_color, wind_dir)
-            current_x += dir_width + 2  # 2px spacing
+                # Row 17-23: Wind (direction, speed, MPH)
+                wind_speed = weather_data.get('wind_speed', 0)
+                wind_dir = weather_data.get('wind_dir', 'N')
+                wind_color = palette.get(8, (255, 165, 0))  # Orange
+                wind_graphics_color = graphics.Color(wind_color[0], wind_color[1], wind_color[2])
+                baseline_y3 = 17 + self.font_ascents.get(2, 7)
 
-            # Draw speed
-            speed_str = f"{wind_speed:02d}"
-            speed_width = graphics.DrawText(self.canvas, self.fonts.get(2, font_small), current_x, baseline_y3, wind_graphics_color, speed_str)
-            current_x += speed_width + 2  # 2px spacing
+                current_x = 1
+                dir_width = graphics.DrawText(self.canvas, font_medium, current_x, baseline_y3, wind_graphics_color, wind_dir)
+                current_x += dir_width + 2
+                speed_width = graphics.DrawText(self.canvas, font_medium, current_x, baseline_y3, wind_graphics_color, f"{wind_speed:02d}")
+                current_x += speed_width + 2
+                graphics.DrawText(self.canvas, font_medium, current_x, baseline_y3, wind_graphics_color, "MPH")
 
-            # Draw MPH
-            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), current_x, baseline_y3, wind_graphics_color, "MPH")
+                # Row 24-30: Cloud Cover + Pressure
+                clouds = weather_data.get('clouds', 0)
+                cloud_color = palette.get(13, (135, 206, 235))  # Sky Blue
+                cloud_graphics_color = graphics.Color(cloud_color[0], cloud_color[1], cloud_color[2])
+                baseline_y4 = 24 + self.font_ascents.get(2, 7)
+                graphics.DrawText(self.canvas, font_medium, 1, baseline_y4, cloud_graphics_color, f"CL{clouds}%")
 
-            # Line 4: Humidity (y=24)
-            humidity_color = palette.get(9, (255, 0, 255))  # Pink/Magenta
-            humidity_graphics_color = graphics.Color(humidity_color[0], humidity_color[1], humidity_color[2])
-            baseline_y4 = 24 + self.font_ascents.get(2, 7)
-            graphics.DrawText(self.canvas, self.fonts.get(2, font_small), 1, baseline_y4, humidity_graphics_color, f"RH{humidity}%")
+                # Pressure with trend arrow - right-aligned
+                pressure = weather_data.get('pressure', 0)
+                pressure_trend = weather_data.get('pressure_trend', 'steady')
+                trend_arrows = {'rising': '↑', 'falling': '↓', 'steady': '→'}
+                arrow = trend_arrows.get(pressure_trend.lower(), '→')
 
-            # Pressure with trend arrow - right-aligned on same line as humidity
-            pressure = weather_data.get('pressure', 0)
-            pressure_trend = weather_data.get('pressure_trend', 'steady')
+                pressure_int = int(pressure)
+                pressure_dec = int((pressure - pressure_int) * 100)
 
-            # Map trend to arrow
-            trend_arrows = {'rising': '↑', 'falling': '↓', 'steady': '→'}
-            arrow = trend_arrows.get(pressure_trend.lower(), '→')
+                # Measure widths offscreen
+                arrow_int_width = graphics.DrawText(self.canvas, font_medium, -1000, baseline_y4, cloud_graphics_color, f"{arrow}{pressure_int}")
+                period_width = graphics.DrawText(self.canvas, font_small, -1000, baseline_y4, cloud_graphics_color, ".")
+                dec_width = graphics.DrawText(self.canvas, font_medium, -1000, baseline_y4, cloud_graphics_color, f"{pressure_dec:02d}")
+                in_width = graphics.DrawText(self.canvas, font_small, -1000, baseline_y4 - 1, cloud_graphics_color, "in")
 
-            # Split pressure into parts for smaller decimal point
-            pressure_int = int(pressure)
-            pressure_dec = int((pressure - pressure_int) * 100)
+                leading_space = 2
+                tighter_spacing = -1
+                total_width = leading_space + arrow_int_width + period_width + tighter_spacing + dec_width + tighter_spacing + in_width
+                pressure_x = self.config.display_width - total_width - 1
+                current_x = pressure_x + leading_space
 
-            font_medium = self.fonts.get(2, font_small)
-            font_tiny = self.fonts.get(1, font_small)
+                graphics.DrawText(self.canvas, font_medium, current_x, baseline_y4, cloud_graphics_color, f"{arrow}{pressure_int}")
+                current_x += arrow_int_width
+                graphics.DrawText(self.canvas, font_small, current_x + tighter_spacing, baseline_y4, cloud_graphics_color, ".")
+                current_x += period_width + tighter_spacing
+                graphics.DrawText(self.canvas, font_medium, current_x + tighter_spacing, baseline_y4, cloud_graphics_color, f"{pressure_dec:02d}")
+                current_x += dec_width + tighter_spacing
+                graphics.DrawText(self.canvas, font_small, current_x, baseline_y4 - 1, cloud_graphics_color, "in")
 
-            # Measure widths offscreen
-            arrow_int_width = graphics.DrawText(self.canvas, font_medium, -1000, baseline_y4, humidity_graphics_color, f"{arrow}{pressure_int}")
-            period_width = graphics.DrawText(self.canvas, font_tiny, -1000, baseline_y4, humidity_graphics_color, ".")
-            dec_width = graphics.DrawText(self.canvas, font_medium, -1000, baseline_y4, humidity_graphics_color, f"{pressure_dec:02d}")
-            in_width = graphics.DrawText(self.canvas, font_tiny, -1000, baseline_y4 - 1, humidity_graphics_color, "in")
+            # ===== PAGE 2: UV Index, Humidity, Dew Point, Wind Gust =====
+            else:
+                # UV Index color scale function
+                def get_uv_color(uv):
+                    """Get color for UV index based on EPA scale"""
+                    if uv < 3:
+                        return palette.get(3, (0, 255, 0))  # Green (Low)
+                    elif uv < 6:
+                        return palette.get(5, (255, 255, 0))  # Yellow (Moderate)
+                    elif uv < 8:
+                        return palette.get(8, (255, 165, 0))  # Orange (High)
+                    elif uv < 11:
+                        return palette.get(2, (255, 0, 0))  # Red (Very High)
+                    else:
+                        return palette.get(12, (255, 20, 147))  # Deep Pink (Extreme)
 
-            # Calculate total width with tighter decimal spacing
-            leading_space = 2
-            tighter_spacing = -1
-            total_width = leading_space + arrow_int_width + period_width + tighter_spacing + dec_width + tighter_spacing + in_width
-            pressure_x = self.config.display_width - total_width - 1
+                # Row 0-9: UV Index (large)
+                uvi = weather_data.get('uvi', 0)
+                uv_color = get_uv_color(uvi)
+                uv_graphics_color = graphics.Color(uv_color[0], uv_color[1], uv_color[2])
+                baseline_y = 0 + self.font_ascents.get(3, 10)
 
-            # Add leading space
-            current_x = pressure_x + leading_space
+                # Draw "UV" label
+                graphics.DrawText(self.canvas, font_medium, 1, baseline_y - 2, uv_graphics_color, "UV")
+                # Draw UV index value (large)
+                uv_str = f"{uvi:.1f}" if uvi < 10 else f"{int(uvi)}"
+                graphics.DrawText(self.canvas, font_large, 14, baseline_y, uv_graphics_color, uv_str)
 
-            # Draw arrow + integer part
-            graphics.DrawText(self.canvas, font_medium, current_x, baseline_y4, humidity_graphics_color, f"{arrow}{pressure_int}")
-            current_x += arrow_int_width
+                # Row 10-16: Humidity (moved from page 1)
+                humidity = weather_data.get('humidity', 0)
+                humidity_color = palette.get(9, (255, 0, 255))  # Pink/Magenta
+                humidity_graphics_color = graphics.Color(humidity_color[0], humidity_color[1], humidity_color[2])
+                baseline_y2 = 10 + self.font_ascents.get(2, 7)
+                graphics.DrawText(self.canvas, font_medium, 1, baseline_y2, humidity_graphics_color, f"RH{humidity}%")
 
-            # Draw period with tighter spacing
-            graphics.DrawText(self.canvas, font_tiny, current_x + tighter_spacing, baseline_y4, humidity_graphics_color, ".")
-            current_x += period_width + tighter_spacing
+                # Row 17-23: Dew Point
+                dew_point = weather_data.get('dew_point', 0)
+                dew_color = palette.get(7, (0, 255, 255))  # Cyan
+                dew_graphics_color = graphics.Color(dew_color[0], dew_color[1], dew_color[2])
+                baseline_y3 = 17 + self.font_ascents.get(2, 7)
+                graphics.DrawText(self.canvas, font_medium, 1, baseline_y3, dew_graphics_color, f"DP{dew_point}F")
 
-            # Draw decimal digits with tighter spacing
-            graphics.DrawText(self.canvas, font_medium, current_x + tighter_spacing, baseline_y4, humidity_graphics_color, f"{pressure_dec:02d}")
-            current_x += dec_width + tighter_spacing
-
-            # Draw "in" moved up 1px from baseline
-            graphics.DrawText(self.canvas, font_tiny, current_x, baseline_y4 - 1, humidity_graphics_color, "in")
+                # Row 24-30: Wind Gust
+                wind_gust = weather_data.get('wind_gust', 0)
+                gust_color = palette.get(14, (255, 215, 0))  # Gold
+                gust_graphics_color = graphics.Color(gust_color[0], gust_color[1], gust_color[2])
+                baseline_y4 = 24 + self.font_ascents.get(2, 7)
+                graphics.DrawText(self.canvas, font_medium, 1, baseline_y4, gust_graphics_color, f"GS{wind_gust}MPH")
 
             # Progress bar on row 31 (30-second countdown)
             progress = min(1.0, elapsed_seconds / duration)
